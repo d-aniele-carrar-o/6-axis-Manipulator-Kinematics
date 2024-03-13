@@ -1,4 +1,5 @@
 function [step] = get_step( T_i, T_f )
+    T = inv(T_f) * T_i;
     T = T_f / T_i;
     R = T(1:3,1:3);
     
@@ -16,4 +17,3 @@ function [step] = get_step( T_i, T_f )
 
     step = [v; w];
 end
-

@@ -1,0 +1,36 @@
+function plot_trajectory( positions, velocities, qd )
+    params
+    
+    % Setup plot figure
+    % TODO: extract precise bouding limits for the plot
+    axs = axes( 'XLim', [-0.5, 0.5], 'YLim', [-0.5, 0.5], 'ZLim', [-0.7, 0.7] ); 
+    view(3); grid on;
+    handles(1) = axs;
+
+    % Number of generated viapoints
+    N = max( size( positions ) )
+    
+    % Plot position and velocity joint space trajectories
+    plot_joint_trajectory_pos_and_vel( positions, velocities, qd );
+    
+    % Compare desired pose and computed final pose from trajectory generation
+    Td         = direct_kinematics_cpp( qd, AL, A, D )
+    actual_Tf  = direct_kinematics_cpp( positions(end,:), AL, A, D )
+    
+    % Plot trajectory
+    pos = zeros( N, 3 );
+    [Te, handlesR] = direct_kinematics_draw( positions(1,:), handles, true );
+    pos(1,:) = Te(1:3,4)';
+    % plot3( pos(1,1), pos(1,2), pos(1,3), 'r--', "LineWidth", 2, "Parent", handles(1) );
+    for i=2:N
+        [Te, ~] = direct_kinematics_draw( positions(i,:), handlesR, false );
+        pos(i,:) = Te(1:3,4)';
+        % h = plot3( pos(1:i,1), pos(1:i,2), pos(1:i,3), 'r--', "LineWidth", 2, "Parent", handles(1) );
+        
+        % pause(0.1)
+        % set( h, 'Visible', 'off' )
+    end
+    % set( h, 'Visible', 'on' )
+    plot3( pos(:,1), pos(:,2), pos(:,3), 'r--', "LineWidth", 2, "Parent", handles(1) );
+end
+
