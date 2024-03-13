@@ -5,7 +5,19 @@ The repo includes the application of Denvait-Hartenberg conventions for frame pl
 [Here](https://github.com/d-aniele-carrar-o/ABB-IRb-7600-Direct-and-Inverse-Kinematics) you can find detailed explanation of the Direct and Inverse Kinematics for 6-axis manipulator ABB IRb-7600. \
 [Here](https://github.com/d-aniele-carrar-o/ur5Robotics) you can find a project which uses UR5 with ROS for simulation and also setup for real robot utilization for a pick-and-place task with Computer Vision implemented.
 
-The explanation of how the repo is organized will be added soon.
-For now, it is possible to download the souce files and run testing_script.m in the 'scr' folder to see how the main features work. It is possible to edit the main parameters of kinematics, trajectory generation and simulation in the 'params' script.
+How to use the code:
+- clone the repository
+- open the folder in Matlab
+- go to "src" folder and run "params" script (click on "Add to path" if prompt message)
+- compile c++ functions:
+    - additional initial step for Windows users:
+        - in the HOME tab, click on Add-Ons
+        - search for MinGW and install it
+    - run the "compile_cpp_code.m" script inside "cpp_src" folder
+    - on MacOS you may need to install Xcode (or just Xcode Command Line Tools)
+    - make sure that in the console you get "MEX completed successfully." for each ".cpp" file
+- run "testing_script" and check that the 3D plot of the manipulator appears.
+
+It is possible to edit the main parameters of kinematics, trajectory generation and simulation in the 'params' script.
 
 This repo is still under active developement and aims to implement as much as possible for what concerns manipulator control and utilization.
