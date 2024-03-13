@@ -6,7 +6,7 @@ addpath("3_link_manipulators/")
 addpath("trajectory_scripts/")
 addpath("robot_descriptions/")
 addpath("robot_urdf/")
-addpath("src/")
+addpath("cpp_src/")
 addpath("mex_compiled_functions/")
 
 
@@ -50,7 +50,8 @@ manipulator = "UR5";
 real_robot  = true;
 
 % Eventual transformation between World Reference Frame and Frame 0
-Trf_0 = eye(4);
+Trf_0       = eye(4);
+
 
 % Load manipulator's D-H parameters and other useful parameters to compute kinematics
 if manipulator == "ABB"  % ================================================
