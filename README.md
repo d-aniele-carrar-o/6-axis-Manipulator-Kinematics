@@ -20,4 +20,7 @@ How to use the code:
 
 It is possible to edit the main parameters of kinematics, trajectory generation and simulation in the 'params' script.
 
+In order to use the code for your custom manipulator, it is enough to add its D-H parameters table (following my convention) in "params" script and change the name of the variable "manipulator" to your newly added one. \
+If you do not have the relative urdf, put the "real_robot" flag to false and the standard Matlab's plot3 function will be used to display the manipulator configuration and the trajectory simulation.
+
 This repo is still under active developement and aims to implement as much as possible for what concerns manipulator control and utilization.
