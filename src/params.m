@@ -1,14 +1,13 @@
+if ~loaded_params
 addpath("utils/")
 addpath("plot_utils/")
-addpath("ABB_scripts/")
-addpath("UR5_scripts/")
 addpath("3_link_manipulators/")
 addpath("trajectory_scripts/")
 addpath("robot_descriptions/")
 addpath("robot_urdf/")
 addpath("cpp_src/")
 addpath("mex_compiled_functions/")
-
+end
 
 % Debug mode
 verbose = false;
@@ -16,18 +15,18 @@ verbose = false;
 % Trajectory generation parameters ----------------------------------------
 
 % Time interval constant used for trajectory generation
-dt      = 0.01;
+dt      = 0.02;
 
 % Refreshing rate for simulation update
-rate    = rateControl( 1/(dt*2) );
+rate    = rateControl( 1/(dt) );
 
 % Maximum velocity and acceleration for trajectory generation
 max_vel = 10;
 max_acc = 10;
 
-space      = "task";
-kinematics = "IDK";
-traj_type  = "quintic";
+space      = "joint";
+kinematics = "IK";
+traj_type  = "LSPB";
 
 if kinematics == "IDK"
     % Precision of final pose - determines when the loop ends (IDK)
@@ -40,7 +39,7 @@ end
 % -------------------------------------------------------------------------
 
 % Plot parameters
-plot_grahps = true;
+plot_grahps = false;
 
 
 % Manipulator in use for which compute some kinematics (for now just ABB and UR5)
@@ -48,6 +47,9 @@ manipulator = "UR5";
 
 % Use the robot's urdf to show the simulation, if false the simulations uses matlab's plot3
 real_robot  = true;
+
+% Presence of gripper
+gripper     = false;
 
 % Eventual transformation between World Reference Frame and Frame 0
 Trf_0       = eye(4);
@@ -71,12 +73,15 @@ if manipulator == "ABB"  % ================================================
     %   i = |  0  |   1   |   2   |   3   |   4   |   5   |   6   |
        AL = [    0,   pi/2,      0,   pi/2,  -pi/2,   pi/2,   -0  ];
         A = [    0,   0.41,  1.075,  0.165,      0,      0,   -0  ];
-        D = [  -0 ,   0.78,      0,      0,  1.056,      0,   0.25];
+        D = [  -0 ,   0.78,      0,      0,  2.012,      0,   0.25];
        TH = [  -0 ,      0,      0,      0,      0,      0,      0];
     %  th = |  -  |  th1  |  th2  |  th3  |  th4  |  th5  |  th6  |
 
     % Robot's urdf still not available
-    real_robot = false;
+    if ~loaded_params && real_robot
+        robot  = importrobot( "robot_urdf/ABB_IRb-7600.urdf" );
+        config = robot.homeConfiguration;
+    end
 
 elseif manipulator == "UR5"  % ============================================
     % UR5 D-H parameters
@@ -88,9 +93,15 @@ elseif manipulator == "UR5"  % ============================================
        TH = [   -0   ,        0,        0,        0,        0,        0,       0,       0];
     %  th = |   -    |    th1  |   th2   |   th3   |   th4   |   th5   |   th6  |   -    |
     
-    if real_robot
+    if ~loaded_params && real_robot
         robot  = importrobot( "robot_urdf/ur5.urdf" );
-        % show( robot, Visuals="on", Collisions="off" )
+        loaded_params = true;
+        disp("non dovrei essere stampato piu di una volta")
+    end
+    if real_robot
+        tic
+        config = robot.homeConfiguration;
+        toc
     end
 
 elseif manipulator == "custom"  % ======================================

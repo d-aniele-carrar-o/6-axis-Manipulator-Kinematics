@@ -1,5 +1,5 @@
 function [time, positions, velocities] = cubic_trajectory( ti, tf, qi, qf )
-    params
+    parameters(1)
 
     % Trajectory duration (if max vel or max acc are not violated)
     T  = tf - ti;
