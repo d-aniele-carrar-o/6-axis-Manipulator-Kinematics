@@ -37,7 +37,7 @@ public:
         for ( double& j : J_inv )
             j += k;
         
-        TypedArray<double> q_dot_d  = matrixMult( J_inv, v_dot_d );
+        TypedArray<double> q_dot_d = matrixMult( J_inv, v_dot_d );
 
         double v_max = 0.0;
         for ( double q : q_dot_d )

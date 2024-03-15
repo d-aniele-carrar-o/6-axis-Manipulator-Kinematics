@@ -1,15 +1,20 @@
-% Direct Kinematics of the + draw UR5
-% Th: six joint angles
-% pe: cartesian position of the end effector
-% Re: Rotation matrix of the end effecto
-% handles: handles to the differetn transofmrations. THe first element links to the figure 
-% firstTime
+% Function for computing DK & plot manipulator configuration in 3D space
+% Parameters:
+% - q         : manipulator configuration - [6x1]
+% - handles   : handles to the different transofmrations. 
+%               the first element links to existing axes object
+% - firstTime : if true, draw and save manipulator's configuration and axes; 
+%               if false, update existing manipulator's configuration
 function [Te, handlesR] = direct_kinematics_draw( q, handles, firstTime )
-    params
+    parameters(1)
 
+    % Compute DK
     Te  = direct_kinematics_cpp( q, AL, A, D, TH );
-
+    
+    % Extract axes object for plotting
     axs = handles(1);
+    
+    % Number of joint variables
     N   = max(size( q ));
     
     % If first time draw, else update
@@ -39,7 +44,7 @@ function [Te, handlesR] = direct_kinematics_draw( q, handles, firstTime )
         end
 
         % Draw end-effector link and frame, if existing
-        if max(size( D )) > 7
+        if gripper
             % Compute transformation matrix
             Ti  = transf_i_1_i_cpp( 6, 0, AL, A, D, TH );
             
@@ -47,27 +52,28 @@ function [Te, handlesR] = direct_kinematics_draw( q, handles, firstTime )
             Oi  = Ti(1:3,4);
             plot3( [0, Oi(1)], [0, Oi(2)], [0, Oi(3)], 'Parent', ti, 'linestyle', '-', 'Color', [0.5 0.5 0.5], 'LineWidth', 3 );
             
-            % Plot frame
             ti = hgtransform( 'Parent', h, 'Matrix', Ti );
             
             % Save frame transformation
             handlesR(8) = ti;
         end
         
+         % Plot last frame
         h = triad( 'Parent', ti, 'linewidth', 2, 'scale', 0.1 );
-        
 
     else
         handlesR(1) = axs;
-
+        
+        % Update existing configuration
         for i=1:N
             Ti  = transf_i_1_i_cpp( i-1, q(i), AL, A, D, TH );
             ti  = handles(i+1);
             set( ti, 'Matrix', Ti )
             handlesR(i+1) = ti;
         end
-
-        if max(size( D )) > 7
+        
+        % Draw end-effector link and frame, if existing
+        if gripper
             Ti  = transf_i_1_i_cpp( 6, 0, AL, A, D, TH );
             ti  = handles(8);
             set( ti, 'Matrix', Ti );

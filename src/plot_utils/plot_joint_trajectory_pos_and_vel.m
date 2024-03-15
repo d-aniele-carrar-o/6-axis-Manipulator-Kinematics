@@ -1,5 +1,10 @@
+% Function for plotting trajectory's joint configurations/velocities and/or task space positions/angular velocities
+% Parameters:
+% - time       : time steps at which position/velocity points are given - [1xN]
+% - positions  : joint configurations or end-effector poses - [6xN] or [4x4xN]
+% - velocities : joint space or task space velocity points - [6xN]
 function plot_joint_trajectory_pos_and_vel( time, positions, velocities )
-    params
+    parameters(1)
     
     Np = max(size( positions ));
     Nv = max(size( velocities ));

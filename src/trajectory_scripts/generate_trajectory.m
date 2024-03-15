@@ -2,7 +2,7 @@ function [time, positions, velocities] = generate_trajectory( q0, Tf, ti, tf )
     % TO ADD: INITIAL/FINAL VELOCITY IF DIFFERENT FROM ZERO 
     % (like for ex when adding viapoint in the traj in which the ee do NOT have to come to a rest)
     
-    params
+    parameters(1)
 
     if     traj_type == "cubic"
         [time, positions, velocities] = cubic_trajectory( ti, tf, q0, Tf );

@@ -1,5 +1,5 @@
 function [q_dots] = get_joint_velocities( positions, velocities )
-    params
+    parameters(1)
 
     N = max(size( positions ));
     

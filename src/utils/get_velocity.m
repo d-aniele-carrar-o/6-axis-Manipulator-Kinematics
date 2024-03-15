@@ -1,5 +1,5 @@
 function [T, v, angle] = get_velocity( qi, qf, T, tb )
-    params
+    parameters(1)
 
     % compute velocity and check if max velocity is under max allowed
     if space == "joint"  %================================================%
