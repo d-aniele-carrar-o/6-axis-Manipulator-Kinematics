@@ -9,7 +9,7 @@ function parameters( level )
         addpath("cpp_src/")
         addpath("mex_compiled_functions/")
     end
-    
+
     % Debug mode
     verbose = false;
     
@@ -25,9 +25,9 @@ function parameters( level )
     max_vel = 10;
     max_acc = 10;
     
-    space      = "task";
-    kinematics = "IDK";
-    traj_type  = "quintic";
+    space      = "task";     % ["joint", "task"]
+    kinematics = "IDK";      % ["IK", "IDK"]
+    traj_type  = "quintic";  % ["LSPB", "cubic", "quintic"]
     
     if kinematics == "IDK"
         % Precision of final pose - determines when the loop ends (IDK)
@@ -44,7 +44,7 @@ function parameters( level )
     
     
     % Manipulator in use for which compute some kinematics (for now just ABB and UR5)
-    manipulator = "UR5";
+    manipulator = "UR5";  % ["ABB", "UR5", "custom"]
     
     % Use the robot's urdf to show the simulation, if false the simulations uses matlab's plot3
     real_robot  = true;

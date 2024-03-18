@@ -3,7 +3,7 @@ close all;
 
 % Load useful parameters - like dt for trajectory generation, D-H parameters for selected manipulator
 parameters(0)
-
+%%
 % - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 % TESTING SCRIPT FOR DK, IK, IDIFFK, TRAJ GENERATION
 
