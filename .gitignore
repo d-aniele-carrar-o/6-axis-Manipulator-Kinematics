@@ -1,1 +1,3 @@
 src/mex_compiled_functions/*
+src/.vscode
+.DS_Store
