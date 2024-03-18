@@ -3,15 +3,11 @@
 % - time       : time steps at which position/velocity points are given - [1xN]
 % - positions  : joint configurations or end-effector poses - [6xN] or [4x4xN]
 % - velocities : joint space or task space velocity points - [6xN]
-function plot_joint_trajectory_pos_and_vel( time, positions, velocities )
-    parameters(1)
+function plot_joint_trajectory_pos_and_vel( time, positions, velocities, space )
+    N = size( positions, 1 );
     
-    Np = max(size( positions ));
-    Nv = max(size( velocities ));
-
-    if Np == Nv
-        % Joint space plot ------------------------------------------------
-
+    % Joint space plot ----------------------------------------------------
+    if space == "joint"
         % Plot joint space trajectory positions and velocities
         figure
         plot( time, reshape( positions(:,1), [], 1), '.-', time, reshape( positions(:,2), [], 1), '.-', time, reshape( positions(:,3), [], 1), '.-', ...
@@ -29,18 +25,16 @@ function plot_joint_trajectory_pos_and_vel( time, positions, velocities )
         legend( 'q1', 'q2', 'q3', 'q4', 'q5', 'q6' )
         hold off;
     
-    else
-        % Joint space plot ------------------------------------------------
-
+    % Taks space plot -----------------------------------------------------
+    elseif space == "task"
         % Plot task space trajectory positions and velocities
 
-        pos = [];
+        pos = zeros( N/4, 4 );
         
-        % TODO: add angle to plot (transform rotM to angle-axis)
-        for i=1:Np/4
+        for i=1:N/4
             Td       = positions(4*(i-1)+1:4*i,:);
             [ang, ~] = rotm2angle_axis( Td(1:3,1:3) );
-            pos      = [pos; [Td(1:3,4)', ang]];
+            pos(i,:) = [Td(1:3,4)', ang];
         end
 
         figure

@@ -10,53 +10,11 @@
 % - qi          : initial joint configuration - [6x1]
 % - axs         : axes() object, if given, plot on this axes
 % - existing_axes_given : set true if axes is given, if false, function creates new axes for plotting
-function [qf, axs] = plot_trajectory( time, positions, velocities, qi, axs, existing_axes_given )
+function [qf, axs] = plot_trajectory( positions, axs, existing_axes_given )
     parameters(1)
 
     % Number of generated viapoints
     N = max( size( positions ) );
-    
-    if plot_grahps
-        % Plot position and velocity joint space trajectories
-        plot_joint_trajectory_pos_and_vel( time, positions, velocities );
-        hold off;
-    end
-    
-    % Transform, if needed, in order to plot position and velocity profiles
-    if space == "joint" || kinematics == "IDK"
-        task_poses = [];
-        task_vels  = [];
-
-        % Compute end-effector positions in order to plot its trajectory together with the manipulator
-        for i=1:N
-            Te         = direct_kinematics_cpp( positions(i,:), AL, A, D, TH );
-            task_poses = [task_poses; Trf_0*Te];
-            J          = Jacobian_cpp( Te, positions(i,:), AL, A, D, TH );
-            task_vels  = [task_vels; (J * velocities(i,:)')'];
-        end
-        
-        if plot_grahps
-            % Plot position and velocity joint space trajectories
-            plot_joint_trajectory_pos_and_vel( time, task_poses, task_vels );
-            hold off;
-        end
-
-    elseif space == "task"
-        % Transform the end-effector poses using IK of selected manipulator to joint space configurations
-        
-        % TODO: unify these two functions
-        positions  = task2joint_space( qi, positions );
-        velocities = get_joint_velocities( positions, velocities );
-        N          = max( size( positions ) );
-
-        if plot_grahps
-            % Plot position and velocity task space trajectories
-            plot_joint_trajectory_pos_and_vel( time, positions, velocities );
-            hold off;
-        end
-
-    end
-    
     
     % Simulate trajectory
     if ~existing_axes_given
@@ -82,8 +40,7 @@ function [qf, axs] = plot_trajectory( time, positions, velocities, qi, axs, exis
     end
     hold off;
     
-    % Return last joint configuration - useful if after this trajectory
-    % there have to start with another one
+    % Return last joint configuration - useful if after this trajectory there have to start with another one
     qf = positions(end,:);
 
 end

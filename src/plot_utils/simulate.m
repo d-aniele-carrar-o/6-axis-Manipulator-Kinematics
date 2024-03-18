@@ -10,14 +10,42 @@
 function [qf, handlesR] = simulate( time, positions, gripper_positions, velocities, qi, axs, existing_axes_given )
     parameters(0)
     
+    % Transform, if needed, in order to plot position and velocity profile graphs
+    if space == "joint" || kinematics == "IDK"
+        % Compute end-effector positions in order to plot its trajectory together with the manipulator
+        [task_poses, task_vels] = joint2task_space( positions, velocities );
+        
+        if plot_grahps
+            % Plot position and velocity joint space trajectories
+            plot_joint_trajectory_pos_and_vel( time, positions, velocities, "joint" );
+            hold off;
+
+            % Plot position and velocity task space trajectories
+            plot_joint_trajectory_pos_and_vel( time, task_poses, task_vels, "task" );
+            hold off;
+        end
+
+    elseif space == "task"
+        % Transform the end-effector poses using IK of selected manipulator to joint space configurations
+        [qs, q_dots] = task2joint_space( qi, positions, velocities );
+
+        if plot_grahps
+            % Plot position and velocity joint space trajectories
+            plot_joint_trajectory_pos_and_vel( time, qs, q_dots, "joint" );
+            hold off;
+
+            % Plot position and velocity task space trajectories
+            plot_joint_trajectory_pos_and_vel( time, positions, velocities, "task" );
+            hold off;
+        end
+
+    end
+
     disp("[simulate] Press enter to start simulation")
     if real_robot
-        
-        % TODO: call plot_joint_trajectory_pos_and_vel if flag "plot_graphs" is set to true
-        
         % If needed, transform trajectory's positions into joint space
         if space == "task" && kinematics == "IK"
-            positions = task2joint_space( qi, positions );
+            positions = qs;
         end
         
         N = size( positions, 1 );
@@ -71,7 +99,11 @@ function [qf, handlesR] = simulate( time, positions, gripper_positions, velociti
     
     else
         % Use matlab's plot3 function to simulate trajectory
-        [qf, handlesR] = plot_trajectory( time, positions, velocities, qi, axs, existing_axes_given );
+        if space == "task" && kinematics == "IK"
+            [qf, handlesR] = plot_trajectory( qs, axs, existing_axes_given );
+        else
+            [qf, handlesR] = plot_trajectory( positions, axs, existing_axes_given );
+        end
         
     end
     
