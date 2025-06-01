@@ -7,7 +7,7 @@
 % - qi         : initial joint configuration
 % - axs        : if passed, existing axes object on which to plot trajectory
 % - existing_axes_given : true if exising axes is given; if false, create new axes object
-function [qf, handlesR] = simulate( time, positions, gripper_positions, velocities, qi, axs, existing_axes_given )
+function [qf, handlesR] = simulate( robot, time, positions, gripper_positions, velocities, qi, axs, existing_axes_given )
     parameters(0)
     
     % Transform, if needed, in order to plot position and velocity profile graphs
@@ -65,7 +65,7 @@ function [qf, handlesR] = simulate( time, positions, gripper_positions, velociti
 
         end
 
-        % Run the simulation
+        % Run the simulation ======================================================================
         
         % Setup simulation environment
         config = set_robot_configuration( p(1,:), config );
@@ -81,7 +81,11 @@ function [qf, handlesR] = simulate( time, positions, gripper_positions, velociti
         tmp  = (Trf_0 * Te(1:4,4))';
         p_ee = tmp(1:3);
         scatter3( p_ee(1), p_ee(2), p_ee(3), 10, 'r.', 'Parent', axs ); hold on;
-        pause()
+        
+        k = waitforbuttonpress;
+        while k ~= 1
+            k = waitforbuttonpress;
+        end
         
         disp("[simulate] Simulation started.")
         for i=2:N
@@ -90,7 +94,9 @@ function [qf, handlesR] = simulate( time, positions, gripper_positions, velociti
             Te   = direct_kinematics_cpp( p(i,1:6), AL, A, D, TH );
             tmp  = (Trf_0 * Te(1:4,4))';
             p_ee = tmp(1:3);
-            scatter3( p_ee(1), p_ee(2), p_ee(3), 10, 'r.', 'Parent', axs ); hold on;
+            if (mod(i, 5) == 0)
+                scatter3( p_ee(1), p_ee(2), p_ee(3), 10, 'r.', 'Parent', axs ); hold on;
+            end
             waitfor( rate );
         end
 

@@ -5,6 +5,8 @@
   <!-- This mass might be incorrect -->
   <!-- Kinematic model -->
   <!-- Properties from urcontrol.conf -->
+  <!-- pi:   3.1415926535 -->
+  <!-- pi/2: 1.570796327  -->
   <!--
     DH for UR5:
     a     = [           0,  -0.42500, -0.39225,           0,            0,       0]
@@ -98,7 +100,7 @@
   <joint name="shoulder_lift_joint" type="revolute">
     <parent link="shoulder_link"/>
     <child link="upper_arm_link"/>
-    <origin rpy="1.570796325 0.0 0.0" xyz="0.0 0.0 0.0"/>
+    <origin rpy="1.570796325 1.570796327 0.0" xyz="0.0 0.0 0.0"/>
     <axis xyz="0 0 1"/>
     <limit effort="150.0" lower="-3.14159265" upper="3.14159265" velocity="3.15"/>
     <dynamics damping="0.0" friction="0.0"/>
@@ -166,7 +168,7 @@
   <joint name="wrist_1_joint" type="revolute">
     <parent link="forearm_link"/>
     <child link="wrist_1_link"/>
-    <origin rpy="0.0 0.0 0.0" xyz="-0.39225 0.0 0.10915"/>
+    <origin rpy="0.0 0.0 -1.570796327" xyz="-0.39225 0.0 0.10915"/>
     <axis xyz="0 0 1"/>
     <limit effort="28.0" lower="-3.14159265" upper="3.14159265" velocity="3.2"/>
     <dynamics damping="0.0" friction="0.0"/>
@@ -418,6 +420,6 @@
   <joint name="world_joint" type="fixed">
     <parent link="world"/>
     <child link="base_link"/>
-    <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
+    <origin rpy="0.0 0.0 -1.570796327" xyz="0.0 0.0 0.0"/>
   </joint>
 </robot>

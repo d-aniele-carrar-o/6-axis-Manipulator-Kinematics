@@ -12,12 +12,12 @@ function test_Inverse_Kinematics( q0 )
     elseif manipulator == "ABB"
         H  = ABB_inverse_kinematics_cpp( Te(1:3,4), Te(1:3,1:3), AL, A, D );
     elseif manipulator == "custom"
-        H  = Custom_manipulator_inverse_kinematics_cpp( Te(1:3,4), Te(1:3,1:3), AL, A, D );
+        H  = Custom_manipulator_inverse_kinematics_cpp( Te(1:3,4), Te(1:3,1:3), AL, A, D, TH );
     end
 
     pause()
     
-    overlap_views = true;
+    overlap_views = false;
     for i=1:8
         if overlap_views
             [T, ~] = direct_kinematics_draw( H(i,:), axs, true )

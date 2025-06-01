@@ -26,22 +26,21 @@ function [time, positions, velocities] = multipoint_trajectory( qi, viapoints, t
     velocities = [];
     
     % Initial time
-    ti = times(1)
+    ti = times(1);
     
     % TODO: use multithreading to compute every piece of trajectory at the same time
     for i=1:N
-        % Set final time to be previous finish time + new time interval for
-        % new piece of trajectory
-        tf = ti + times(i+1)
+        % Set final time to be previous finish time + new time interval for new piece of trajectory
+        % tf = ti + times(i+1);
 
         % Extract first viapoint - desired pose/configuration
         if     vp_space == "joint"
             % Desired configuration is already in joint space -> nothing to do
-            qf = viapoints(i,:)
+            qf = viapoints(i,:);
             
             if space == "taks"
                 % Transform desired configuration from joint to task space
-                qf = direct_kinematics_cpp( qf, AL, A, D, TH )
+                qf = direct_kinematics_cpp( qf, AL, A, D, TH );
 
             end
 
@@ -55,13 +54,13 @@ function [time, positions, velocities] = multipoint_trajectory( qi, viapoints, t
                 elseif manipulator == "ABB"
                     Hf = ABB_inverse_kinematics_cpp( Tf(1:3,4), Tf(1:3,1:3), AL, A, D );
                 elseif manipulator == "custom"
-                    Hf  = Custom_manipulator_inverse_kinematics_cpp( Tf(1:3,4), Tf(1:3,1:3), AL, A, D );
+                    Hf  = Custom_manipulator_inverse_kinematics_cpp( Tf(1:3,4), Tf(1:3,1:3), AL, A, D, TH );
                 end
-                qf = get_closer( Hf, qi )
+                qf = get_closer( Hf, qi );
 
             elseif space == "task"
                 % Desired pose is already in task space -> nothing to do
-                qf = Tf
+                qf = Tf;
 
             end
         
@@ -71,6 +70,7 @@ function [time, positions, velocities] = multipoint_trajectory( qi, viapoints, t
         fprintf("[multipoint_trajectory] generating piece of trajectory\n")
         % TODO: fix cubic & quintic not working for ti != 0
         [t, p, v] = generate_trajectory( qi, qf, 0, times(i+1) );
+        
         time       = [time,    t+ti];
         positions  = [positions;  p];
         velocities = [velocities; v];
@@ -88,7 +88,7 @@ function [time, positions, velocities] = multipoint_trajectory( qi, viapoints, t
             elseif manipulator == "ABB"
                 Hf  = ABB_inverse_kinematics_cpp( Tf(1:3,4), Tf(1:3,1:3), AL, A, D );
             elseif manipulator == "custom"
-                Hf  = Custom_manipulator_inverse_kinematics_cpp( Tf(1:3,4), Tf(1:3,1:3), AL, A, D );
+                Hf  = Custom_manipulator_inverse_kinematics_cpp( Tf(1:3,4), Tf(1:3,1:3), AL, A, D, TH );
             end
 
             qf = get_closer( Hf, qi );

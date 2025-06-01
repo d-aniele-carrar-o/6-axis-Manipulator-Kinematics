@@ -30,7 +30,7 @@ function [time, positions, velocities] = quintic_trajectory( ti, tf, qi, qf, spa
         % Compute desired position and velocity from selected desired trajectory
         if space == "joint"
             for t=time
-                fprintf( "computing intermediate viapoints - t=%.4f\n", t )
+                % fprintf( "computing intermediate viapoints - t=%.4f\n", t )
 
                 [q_d, q_dot_d] = quintic_polynomial( t, ti, ti+T, qi, qf, zeros(1,6), zeros(1,6), zeros(1,6), zeros(1,6) );
                 
@@ -43,7 +43,7 @@ function [time, positions, velocities] = quintic_trajectory( ti, tf, qi, qf, spa
             velocities = [velocities; zeros(1,6)];
             
             for t=time(2:end)
-                fprintf( "computing intermediate viapoints - t=%.4f\n", t )
+                % fprintf( "computing intermediate viapoints - t=%.4f\n", t )
 
                 [P, V]        = quintic_polynomial( t, ti, ti+T, [ti, Ti(1:3,4)', 0], [ti+T, qf(1:3,4)', angle], zeros(1,5), zeros(1,5), zeros(1,5), zeros(1,5) );
                 quintic_time  = P(1);
@@ -80,7 +80,7 @@ function [time, positions, velocities] = quintic_trajectory( ti, tf, qi, qf, spa
         while (delta_pos > precision_pos || delta_ang > precision_orient) && (count > 0 || time(end) < T-2*dt)
             % Compute desired position and velocity from selected desired trajectory
             time          = [time, time(end)+dt];
-            fprintf( "computing intermediate viapoints - t=%.4f\n", time(end) )
+            % fprintf( "computing intermediate viapoints - t=%.4f\n", time(end) )
 
             [P, V]        = quintic_polynomial( time(end), ti, ti+T, [ti, Ti(1:3,4)', 0], [ti+T, qf(1:3,4)', angle], zeros(1,5), zeros(1,5), zeros(1,5), zeros(1,5) );
             quintic_time  = P(1);

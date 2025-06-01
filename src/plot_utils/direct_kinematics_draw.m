@@ -12,8 +12,14 @@ function [Te, handlesR] = direct_kinematics_draw( q, handles, firstTime )
     Te  = direct_kinematics_cpp( q, AL, A, D, TH );
     
     % Extract axes object for plotting
-    axs = handles(1);
-    
+    if firstTime
+        axs = axes();
+        xlim([-1,1]); ylim([-1,1]); zlim([-0.8,1.2]);
+        view(3); grid on;
+    else
+        axs = handles(1);
+    end
+
     % Number of joint variables
     N   = max(size( q ));
     

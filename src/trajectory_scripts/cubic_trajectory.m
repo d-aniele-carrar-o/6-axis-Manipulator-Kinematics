@@ -80,7 +80,7 @@ function [time, positions, velocities] = cubic_trajectory( ti, tf, qi, qf )
         while (delta_pos > precision_pos || delta_ang > precision_orient) && (count > 0 || time(end) < T-2*dt)
             % Compute desired position and velocity from selected desired trajectory
             time          = [time, time(end)+dt];
-            fprintf( "computing intermediate viapoints - t=%.4f\n", time(end) )
+            % fprintf( "computing intermediate viapoints - t=%.4f\n", time(end) )
             
             [P, V]        = cubic_polynomial( time(end), ti, ti+T, [ti, Ti(1:3,4)', 0], [ti+T, qf(1:3,4)', angle], zeros(1,5), zeros(1,5) );
             cubic_time    = P(1);

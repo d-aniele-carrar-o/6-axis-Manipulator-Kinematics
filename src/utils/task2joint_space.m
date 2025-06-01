@@ -27,7 +27,7 @@ function [qs, q_dots] = task2joint_space( qi, task_positions, task_velocities )
         elseif manipulator == "ABB"
             H  = ABB_inverse_kinematics_cpp( Td(1:3,4), Td(1:3,1:3), AL, A, D );
         elseif manipulator == "custom"
-            H  = Custom_manipulator_inverse_kinematics_cpp( Td(1:3,4), Td(1:3,1:3), AL, A, D );
+            H  = Custom_manipulator_inverse_kinematics_cpp( Td(1:3,4), Td(1:3,1:3), AL, A, D, TH );
         end
         
         % Extract closer solution to previous joint configuration
