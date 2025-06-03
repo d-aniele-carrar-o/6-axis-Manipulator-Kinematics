@@ -65,8 +65,8 @@ function parameters( level )
     % Set table dimensions
     tablePosition = [0.0, 0.0, 0.0];
     tableHeight   = 0.4;
-    tableWidth    = 0.7;
-    tableLength   = 1.5;
+    tableWidth    = 1.5;
+    tableLength   = 0.7;
 
     % Create a base link with the desired position and orientation
     % (on top and in the center of the table)
@@ -135,6 +135,21 @@ function parameters( level )
         end
         robot = get_robot(dhparams, Trf_0, real_robot);
         config = robot.homeConfiguration;
+        T_home = [-1.0000    0.0000    0.0000    0.13105
+                   0.0000    0.0000    1.0000    0.3000
+                   0.0000    1.0000    0.0000    0.15185
+                   0.0000    0.0000    0.0000    1.0000];
+        T_home2 = [1.0000    0.0000    0.0000    0.13105
+                    0.0000    0.0000   -1.0000    -0.3000
+                    0.0000    1.0000    0.0000    0.15185
+                    0.0000    0.0000    0.0000    1.0000];
+        T_glob = Trf_0 * T_home;
+        initial_guess  = set_robot_configuration([-4.7124, -1.8098, -2.1206, -2.3527, -pi/2, 0.0], config);
+        initial_guess2 = set_robot_configuration([-4.7124, -1.3318,  2.1206, -0.7888, -pi/2, 0.0], config);
+        ik = inverseKinematics("RigidBodyTree", robot);
+        [H, ~] = ik("tool0", T_glob, ones(6,1), initial_guess);
+        q_home = [H.JointPosition];
+        config = set_robot_configuration(q_home, config);
         gripper = false;
     
     elseif manipulator == "custom"  % ======================================

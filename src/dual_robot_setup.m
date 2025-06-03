@@ -1,46 +1,31 @@
 parameters(0)
 
-manipulator = "UR3e";
-% UR3e D-H parameters
-%   T :         0->1      1->2      2->3      3->4      4->5      5->6     6->ee
-%   i = |   0    |    1    |    2    |    3    |    4    |    5    |    6   |   ee   |
-    AL = [      0,     pi/2,        0,        0,     pi/2,    -pi/2,       0,   -0   ];
-    A = [       0,        0, -0.24355,  -0.2132,        0,        0,       0,   -0   ];
-    D = [   -0   ,  0.15185,        0,        0,  0.13105,  0.08535,  0.0921,       0];
-    TH = [   -0   ,    -pi/2,    -pi/2,        0,    -pi/2,        0,       0,       0];
-%  th = |   -    |    th1  |   th2   |   th3   |   th4   |   th5   |   th6  |   -    |
-
-N = 7;
-dhparams = zeros(N, 4);
-for i=1:N
-    dhparams(i,:) = [A(i), AL(i), D(i), TH(i)];
-end
-gripper = false;
-
-basePosition_l    = [tablePosition(1)-0.4, tablePosition(2), tableHeight];
+basePosition_l    = [tablePosition(1), tablePosition(2)-0.4, tableHeight];
 baseOrientation_l = [0, 0, 0];
 Trf_0_l = trvec2tform(basePosition_l) * eul2tform(baseOrientation_l);
-basePosition_r    = [tablePosition(1)+0.4, tablePosition(2), tableHeight];
+basePosition_r    = [tablePosition(1), tablePosition(2)+0.4, tableHeight];
 baseOrientation_r = [0, 0, 0];
 Trf_0_r = trvec2tform(basePosition_r) * eul2tform(baseOrientation_r);
 
-robot_left   = get_robot(dhparams, Trf_0_l, true);
-robot_right  = get_robot(dhparams, Trf_0_r, true);
-config_left  = robot_left.homeConfiguration;
-config_right = robot_right.homeConfiguration;
+robot_left  = get_robot(dhparams, Trf_0_l, true);
+robot_right = get_robot(dhparams, Trf_0_r, true);
 
 figure;
 create_environment(tablePosition, tableLength, tableWidth, tableHeight);
 
 % Set initial configurations
-q0_left  = [0, pi/4, -pi/4, 0, pi/4, 0];
-q0_right = [0, pi/4, -pi/4, 0, pi/4, 0];
-config_left  = set_robot_configuration(q0_left, config_left);
-config_right = set_robot_configuration(q0_right, config_right);
+T_home_w_l = Trf_0 * T_home;
+T_home_w_r = Trf_0 * T_home2;
+[config_left,  ~] = ik("tool0", T_home_w_l, ones(6,1), initial_guess);
+[config_right, ~] = ik("tool0", T_home_w_r, ones(6,1), initial_guess2);
+q_home_l = [config_left.JointPosition]
+q_home_r = [config_right.JointPosition]
+config_left  = set_robot_configuration(q_home_l, config_left);
+config_right = set_robot_configuration(q_home_r, config_right);
 
 % Show both robots in the environment
-ax = show(robot_left, config_left, "Visuals", "on", "Frames", "off", "FastUpdate", true, "PreservePlot", false); hold on;
-show(robot_right, config_right, "Visuals", "on", "Frames", "off", "FastUpdate", true, "PreservePlot", false, "Parent", ax);
+ax = show(robot_left, config_left, "Visuals", "on", "Frames", "on", "FastUpdate", true, "PreservePlot", false); hold on;
+show(robot_right, config_right, "Visuals", "on", "Frames", "on", "FastUpdate", true, "PreservePlot", false, "Parent", ax);
 
 % Set up the plot
 title('Dual Robot Working Environment');

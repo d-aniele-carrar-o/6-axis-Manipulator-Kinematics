@@ -10,6 +10,17 @@ function [Te, handlesR] = direct_kinematics_draw( q, handles, firstTime )
 
     % Compute DK
     Te  = direct_kinematics_cpp( q, AL, A, D, TH );
+
+    if real_robot
+        config = set_robot_configuration(q, config);
+        if firstTime
+            axs = show( robot, config, "Visuals", "on", "Frames", "off", "FastUpdate", true, "PreservePlot", false );
+            handlesR(1) = axs;
+        else
+            show( robot, config, "Visuals", "on", "Frames", "off", "FastUpdate", true, "PreservePlot", false, "Parent", handles(1) );
+        end
+        return
+    end
     
     % Extract axes object for plotting
     if firstTime

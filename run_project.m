@@ -27,5 +27,4 @@ parameters(0)
 
 % Run the testing script
 % testing_script;
-% robot_in_environment;
-dual_robot_setup()
+dual_robot_setup;

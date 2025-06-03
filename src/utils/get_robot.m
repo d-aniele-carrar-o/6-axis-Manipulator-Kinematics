@@ -41,6 +41,6 @@ function [robot] = get_robot(dhparams, Trf_0, real_robot)
         end
     end
 
-    showdetails(robot)
+    % showdetails(robot)
     
 end

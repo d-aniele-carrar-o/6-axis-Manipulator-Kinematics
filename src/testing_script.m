@@ -6,36 +6,30 @@ parameters(0)
 %%
 % - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 % TESTING SCRIPT FOR DK, IK, IDIFFK, TRAJ GENERATION
+ax = show(robot, config);
+xlim(ax, [-0.5, 0.5]);  % Custom X limits
+ylim(ax, [-0.5, 0.5]);  % Custom Y limits
+zlim(ax, [0, 1.0]);     % Custom Z limits
+
+pause()
+close all;
 
 % Initial joint configuration
-q0 = [0.33, pi/6, -1.189, 2.127, 0.563, -2.138]
-
-% 0.0157   -0.6241   -0.7812   -0.2411
-% 0.8392    0.4329   -0.3291   -0.0237
-% 0.5436   -0.6504    0.5305    0.8555
-%      0         0         0    1.0000
-
+% q0 = [0.33, pi/6, -1.189, 2.127, 0.563, -2.138]
+q0 = [-4.7124, -1.8098, -2.1206, -2.3527, -pi/2, 0.0]
 
 % Compute end-effector pose
-try
-    Te = direct_kinematics_cpp( q0, AL, A, D, TH );
-catch
-    disp('MEX function not available, using simple implementation instead');
-    Te = direct_kinematics_simple( q0, AL, A, D, TH );
-end
-Te
+Te = direct_kinematics_cpp( q0, AL, A, D, TH )
 
-% direct_kinematics_draw( q0, nan, true )
-% config = set_robot_configuration( q0, config );
-% show( robot, config, "Visuals", "on", "Frames", "on", "FastUpdate", true, "PreservePlot", false ); hold on;
-
-% pause()
+direct_kinematics_draw( q0, nan, true );
 
 % Set true to test the solutions of IK
 test_IK = false;
 if test_IK
     test_Inverse_Kinematics( q0 );
 end
+
+pause()
 
 % Compute Jacobian matrix for manipulator
 % J = Jacobian_cpp( Te, q0, AL, A, D, TH )
