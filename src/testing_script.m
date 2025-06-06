@@ -43,6 +43,7 @@ elseif manipulator == "custom"
     pf    = [0.2; 0.2; 0.06];
 end
 Tf = [Rf, pf; 0,0,0,1]
+t1 = 1
 
 % Second viapoint: set second desired configuration/pose (viapoint)
 if     manipulator == "UR5"
@@ -54,6 +55,7 @@ elseif manipulator == "ABB"
 elseif manipulator == "custom"
     Tf2 = Tf + [zeros(3), [-0.4; 0; 0]; 0,0,0,0]
 end
+t2 = 2;
 
 % Third viapoint: set second desired configuration/pose (viapoint)
 if     manipulator == "UR5"
@@ -63,6 +65,7 @@ elseif manipulator == "ABB"
 elseif manipulator == "custom"
     Tf3 = Tf2 + [zeros(3), [0; -0.4; 0]; 0,0,0,0]
 end
+t3 = 3;
 
 % Fourth viapoint: set second desired configuration/pose (viapoint)
 if     manipulator == "UR5"
@@ -72,9 +75,10 @@ elseif manipulator == "ABB"
 elseif manipulator == "custom"
     Tf4 = Tf3 + [zeros(3), [0.4; 0; 0]; 0,0,0,0]
 end
+t4 = 4;
 
 viapoints = [Tf; Tf2];
-times     = [ti, 1, 2];
+times     = [ti, t1, t2];
 
 % Compute multi-viapoint trajectory for selected times and viapoints
 [t, p, v] = multipoint_trajectory( q0, viapoints, times );

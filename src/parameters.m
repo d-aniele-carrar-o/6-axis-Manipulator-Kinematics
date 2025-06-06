@@ -126,8 +126,8 @@ function parameters( level, robot_id )
     % Define robot's world-to-base transformations
     if nargin > 1  % multi-robot setup
         robot_base_transforms = {
-            eul2tform(baseOrientation, "XYZ") * trvec2tform(basePosition + [0, -0.5, 0]);  % Robot 1 position
-            eul2tform(baseOrientation, "XYZ") * trvec2tform(basePosition + [0,  0.5, 0])   % Robot 2 position
+            eul2tform(baseOrientation, "XYZ") * trvec2tform(basePosition + [0, -0.4, 0]);  % Robot 1 position
+            eul2tform(baseOrientation, "XYZ") * trvec2tform(basePosition + [0,  0.4, 0])   % Robot 2 position
         };
     else
         robot_base_transforms = {eul2tform([0, 0, 0], "XYZ") * trvec2tform([0, 0, 0.5])};
