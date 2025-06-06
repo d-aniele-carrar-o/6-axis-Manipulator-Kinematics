@@ -109,7 +109,7 @@ function [time, positions, velocities] = cubic_trajectory( ti, tf, qi, qf )
             end
             
             % For debug purposes
-            if false
+            if debug
                 count
                 q_dot_lim = limited_q_dot'
                 next_q = q_next'

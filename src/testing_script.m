@@ -6,6 +6,13 @@ close all;
 %%
 % - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 % TESTING SCRIPT FOR DK, IK, IDIFFK, TRAJ GENERATION
+ax = show(robot, config);
+xlim(ax, [-0.5, 0.5]);  % Custom X limits
+ylim(ax, [-0.5, 0.5]);  % Custom Y limits
+zlim(ax, [0, 1.0]);     % Custom Z limits
+
+pause()
+close all;
 
 % Initial joint configuration
 q0 = [0, -pi/6, -pi/2, -pi/3, -pi/2, 0.0]
@@ -14,11 +21,15 @@ q0 = [0, -pi/6, -pi/2, -pi/3, -pi/2, 0.0]
 [T_w_e, Te] = direct_kinematics( q0 )
 % direct_kinematics_draw( robot, config, q0, NaN, true );
 
+direct_kinematics_draw( q0, nan, true );
+
 % Set true to test the solutions of IK
 test_IK = false;
 if test_IK
     test_Inverse_Kinematics( q0 );
 end
+
+pause()
 
 % Compute Jacobian matrix for manipulator
 % J = Jacobian_cpp( Te, q0, AL, A, D, TH )
@@ -79,6 +90,7 @@ times     = [ti, 1, 2];
 
 % Compute multi-viapoint trajectory for selected times and viapoints
 [t, p, v] = multipoint_trajectory( q0, viapoints, times );
+% writematrix(round(p, 5), "ur5_coppeliasim/python/coppeliasim_connection/trajectory.txt")
 
 % Simulate trajectory
 [qf, handlesR] = simulate( t, p, [], v, q0, NaN, false );

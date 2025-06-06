@@ -38,7 +38,7 @@ function parameters( level )
     
     
     % Manipulator in use for which compute some kinematics (for now just ABB and UR5)
-    manipulator = "UR3e";  % ["ABB", "UR5", "custom"]
+    manipulator = "UR3e";  % ["ABB", "UR5", "UR3e", "custom"]
     
     % Use the robot's urdf to show the simulation, if false the simulations uses matlab's plot3
     real_robot  = true;

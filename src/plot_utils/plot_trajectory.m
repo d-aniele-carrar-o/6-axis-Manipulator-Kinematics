@@ -15,18 +15,13 @@ function [qf, axs] = plot_trajectory( positions, axs, existing_axes_given )
 
     % Number of generated viapoints
     N = max( size( positions ) );
-    
-    % Simulate trajectory
-    if ~existing_axes_given
-        figure
-        axs = axes(); view(3); grid on;
-    end
-
+  
     % Draw manipulator simulation and end-effector trajectory
     [Te, handlesR] = direct_kinematics_draw( positions(1,:), axs, true );
     temp           = (Trf_0*Te(1:4,4))';
     pos            = temp(1:3);
     scatter3( pos(1), pos(2), pos(3), 10, 'r.',  "Parent", handlesR(1) );
+    
     pause()
     disp("[simulate] Simulation started.")
 
@@ -35,8 +30,8 @@ function [qf, axs] = plot_trajectory( positions, axs, existing_axes_given )
         temp           = (Trf_0*Te(1:4,4))';
         pos            = temp(1:3);
         scatter3( pos(1), pos(2), pos(3), 10, 'r.',  "Parent", handlesR(1) ); hold on;
-        waitfor( rate );
         
+        waitfor( rate );
     end
     hold off;
     
@@ -44,4 +39,3 @@ function [qf, axs] = plot_trajectory( positions, axs, existing_axes_given )
     qf = positions(end,:);
 
 end
-
