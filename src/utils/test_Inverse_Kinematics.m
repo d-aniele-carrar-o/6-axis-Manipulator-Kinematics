@@ -1,5 +1,5 @@
 function test_Inverse_Kinematics( q0 )
-    parameters(0)
+    parameters(1)
 
     % Plot the configuration of the manipulator
     axs = axes(); view(3); grid on;

@@ -7,8 +7,8 @@
 % - qi         : initial joint configuration
 % - axs        : if passed, existing axes object on which to plot trajectory
 % - existing_axes_given : true if exising axes is given; if false, create new axes object
-function [qf, handlesR] = simulate( robot, time, positions, gripper_positions, velocities, qi, axs, existing_axes_given )
-    parameters(0)
+function [qf, handlesR] = simulate( robot, config, time, positions, gripper_positions, velocities, qi, axs, existing_axes_given )
+    parameters(1)
     
     % Transform, if needed, in order to plot position and velocity profile graphs
     if space == "joint" || kinematics == "IDK"
@@ -75,6 +75,9 @@ function [qf, handlesR] = simulate( robot, time, positions, gripper_positions, v
         else
             show( robot, config, "Visuals", "on", "Frames", "off", "FastUpdate", true, "PreservePlot", false, "Parent", axs ); hold on;
         end
+
+        xlim([-1,1]); ylim([-1,1]); zlim([0,1.2]);
+        view(3); grid on;
         
         % Plot manipulator and scatter the positions of the end-effector to highlight trajectory 3D in space
         Te   = direct_kinematics_cpp( p(1,1:6), AL, A, D, TH );

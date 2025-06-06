@@ -8,7 +8,7 @@ function [time, positions, velocities] = cubic_trajectory( ti, tf, qi, qf )
     if     space == "joint"
         [T, ~, ~]     = get_velocity( qi, qf, T, 0 );
     elseif space == "task"
-        [T_w_e_i, Ti] = direct_kinematics( qi );
+        [~, Ti] = direct_kinematics( qi );
         [T, ~, angle] = get_velocity( Ti, qf, T, 0 );
     end
     
@@ -96,7 +96,7 @@ function [time, positions, velocities] = cubic_trajectory( ti, tf, qi, qf )
 
             % Update current end-effector pose
             last_Te     = Te;
-            [T_w_e, Te] = direct_kinematics( q_next );
+            [~, Te] = direct_kinematics( q_next );
             
             % Compute position and orientation "distance" from previous position, if below threshold -> stop trajectory
             [delta_pos, delta_ang, delta_pos_last, delta_ang_last] = compute_distance( Te, last_Te, qf );
@@ -109,7 +109,7 @@ function [time, positions, velocities] = cubic_trajectory( ti, tf, qi, qf )
             end
             
             % For debug purposes
-            if debug
+            if verbose
                 count
                 q_dot_lim = limited_q_dot'
                 next_q = q_next'

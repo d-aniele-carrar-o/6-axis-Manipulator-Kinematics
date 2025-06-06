@@ -33,9 +33,6 @@ cd(fullfile(project_root, 'src'));
 
 clear; clc; close all;
 
-% Load parameters
-parameters(0)
-
 % Run the testing script
-testing_script;
-% dual_robot_setup;
+% testing_script;
+dual_robot_setup;

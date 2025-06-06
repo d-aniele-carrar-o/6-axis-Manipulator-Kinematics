@@ -1,4 +1,21 @@
 function create_environment(tablePosition, tableLength, tableWidth, tableHeight)
+    xlim([-0.7,0.7]); ylim([-1,1]); zlim([-0.2,1.2]);
+    xlabel('X [m]'); ylabel('Y [m]'); zlabel('Z [m]');
+    view(3);
+
+    % Add proper lighting for textures
+    light('Position',[1 1 1],'Style','infinite');
+    light('Position',[-1 -1 1],'Style','infinite');
+    lighting gouraud;
+
+    % Enhance visual appearance with better lighting and materials
+    material('dull');
+    camlight('headlight');
+    camlight('right');
+    lighting gouraud;
+    ax = gca;
+    ax.AmbientLightColor = [0.6 0.6 0.6];
+
     % Add a floor
     [X, Y] = meshgrid(-1:0.5:3, -1:0.5:3);
     Z = zeros(size(X));

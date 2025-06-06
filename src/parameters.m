@@ -1,8 +1,13 @@
-function parameters( level )
+function parameters( level, robot_id )
     % Debug mode
     verbose = false;
     
-    % Trajectory generation parameters ----------------------------------------
+    % Handle optional robot_id parameter
+    if nargin < 2
+        robot_id = 1; % Default to first robot if not specified
+    end
+    
+    % Trajectory generation parameters ------------------------------------------------------------
     
     % Time interval constant used for trajectory generation
     dt      = 0.02;
@@ -31,28 +36,45 @@ function parameters( level )
         % Safety parameter which allows the loop to stop if unreachable poses are given (IDK)
         count = 5;
     end
-    % -------------------------------------------------------------------------
     
     % Plot parameters
     plot_grahps = false;
+    % ---------------------------------------------------------------------------------------------
+
+    robot_types = ["UR3e", "UR3e"];  % each option can be ["ABB", "UR5", "UR3e", "custom"]
     
-    
-    % Manipulator in use for which compute some kinematics (for now just ABB and UR5)
-    manipulator = "UR3e";  % ["ABB", "UR5", "UR3e", "custom"]
-    
-    % Use the robot's urdf to show the simulation, if false the simulations uses matlab's plot3
-    real_robot  = true;
-    
-    % Presence of gripper
-    gripper     = false;
-    
-    % Eventual transformation between World Reference Frame and Frame 0
-    % Trf_0       = eye(4);
-    Trf_0 = eul2tform([0, 0, 0], "XYZ") * trvec2tform([0, 0, 0.5]);
-    
-    
+    % Select current robot based on robot_id
+    % Manipulator in use for which compute kinematics for
+    manipulator = robot_types(robot_id);
+
+    % Use robot's urdf for visualization (if dual robot setup)
+    real_robot = true;
+
+    % Gripper presence depends on robot type
+    gripper = (manipulator == "UR5" || manipulator == "custom");
+
     % Load manipulator's D-H parameters and other useful parameters to compute kinematics
-    if manipulator == "ABB"  % ================================================
+    if     manipulator == "UR5"  % ================================================================
+        % UR5 D-H parameters
+        %   T :         0->1      1->2      2->3      3->4      4->5      5->6     6->ee
+        %   i = |   0    |    1    |    2    |    3    |    4    |    5    |    6   |   ee   |
+        AL = [       0,     pi/2,        0,        0,     pi/2,    -pi/2,       0,   -0   ];
+        A  = [       0,        0,   -0.425, -0.39225,        0,        0,       0,   -0   ];
+        D  = [   -0   , 0.089159,        0,        0,  0.10915,  0.09465,  0.0823,  0.0674]; % 0.1475
+        TH = [   -0   ,        0,    -pi/2,        0,    -pi/2,        0,       0,       0];
+        %  th = |   -    |    th1  |   th2   |   th3   |   th4   |   th5   |   th6  |   -    |
+    
+    elseif manipulator == "UR3e"  % ===============================================================
+        % UR3e D-H parameters
+        %   T :         0->1      1->2      2->3      3->4      4->5      5->6     6->ee
+        %   i = |   0    |    1    |    2    |    3    |    4    |    5    |    6   |   ee   |
+        AL = [       0,     pi/2,        0,        0,     pi/2,    -pi/2,       0,   -0   ];
+        A  = [       0,        0, -0.24355,  -0.2132,        0,        0,       0,   -0   ];
+        D  = [   -0   ,  0.15185,        0,        0,  0.13105,  0.08535,  0.0921,       0];
+        TH = [   -0   ,    -pi/2,    -pi/2,        0,    -pi/2,        0,       0,       0];
+        %  th = |   -    |    th1  |   th2   |   th3   |   th4   |   th5   |   th6  |   -    |
+    
+    elseif manipulator == "ABB"  % ================================================================
         % ABB IRb-7600 D-H, joint limits, and other useful stuff
     
         % Axis limits for IRB 7600-400/2.55, 404 mm for LeanID (not used yet)
@@ -67,74 +89,57 @@ function parameters( level )
         % ABB D-H parameters:
         %   T :      0->1    1->2    2->3    3->4    4->5    5->6
         %   i = |  0  |   1   |   2   |   3   |   4   |   5   |   6   |
-           AL = [    0,   pi/2,      0,   pi/2,  -pi/2,   pi/2,   -0  ];
-            A = [    0,   0.41,  1.075,  0.165,      0,      0,   -0  ];
-            D = [  -0 ,   0.78,      0,      0,  2.012,      0,   0.25];
-           TH = [  -0 ,      0,      0,      0,      0,      0,      0];
+        AL = [    0,   pi/2,      0,   pi/2,  -pi/2,   pi/2,   -0  ];
+        A  = [    0,   0.41,  1.075,  0.165,      0,      0,   -0  ];
+        D  = [  -0 ,   0.78,      0,      0,  2.012,      0,   0.25];
+        TH = [  -0 ,      0,      0,      0,      0,      0,      0];
         %  th = |  -  |  th1  |  th2  |  th3  |  th4  |  th5  |  th6  |
-        
-        if level == 0 && real_robot
-            robot  = importrobot( "robot_urdf/ABB_IRb-7600.urdf" );
-            config = robot.homeConfiguration;
-        end
-    
-    elseif manipulator == "UR5"  % ============================================
-        % UR5 D-H parameters
-        %   T :         0->1      1->2      2->3      3->4      4->5      5->6     6->ee
-        %   i = |   0    |    1    |    2    |    3    |    4    |    5    |    6   |   ee   |
-           AL = [       0,     pi/2,        0,        0,     pi/2,    -pi/2,       0,   -0   ];
-            A = [       0,        0,   -0.425, -0.39225,        0,        0,       0,   -0   ];
-            D = [   -0   , 0.089159,        0,        0,  0.10915,  0.09465,  0.0823,  0.0674]; % 0.1475
-           TH = [   -0   ,        0,    -pi/2,        0,    -pi/2,        0,       0,       0];
-        %  th = |   -    |    th1  |   th2   |   th3   |   th4   |   th5   |   th6  |   -    |
-        
-        if level == 0 && real_robot
-            robot  = importrobot( "robot_urdf/ur5.urdf" );
-            config = robot.homeConfiguration;
-        end
-        gripper = true;
-    
-    elseif manipulator == "UR3e"  % ============================================
-        % UR3e D-H parameters
-        %   T :         0->1      1->2      2->3      3->4      4->5      5->6     6->ee
-        %   i = |   0    |    1    |    2    |    3    |    4    |    5    |    6   |   ee   |
-        AL = [       0,     pi/2,        0,        0,     pi/2,    -pi/2,       0,   -0   ];
-        A  = [       0,        0, -0.24355,  -0.2132,        0,        0,       0,   -0   ];
-        D  = [   -0   ,  0.15185,        0,        0,  0.13105,  0.08535,  0.0921,       0];
-        TH = [   -0   ,    -pi/2,    -pi/2,        0,    -pi/2,        0,       0,       0];
-        %  th = |   -    |    th1  |   th2   |   th3   |   th4   |   th5   |   th6  |   -    |
-        
-        if level == 0 && real_robot
-            robot = importrobot( "robot_urdf/ur3e.urdf" );
-            % Set the base transformation
-            setFixedTransform(robot.Bodies{1}.Joint, Trf_0);
-            config = robot.homeConfiguration;
-        end
-        gripper = false;
-    
-    elseif manipulator == "custom"  % ======================================
+
+    elseif manipulator == "custom"  % =============================================================
         % Custom manipulator D-H parameters
         %   T :         0->1      1->2      2->3      3->4      4->5      5->6     6->ee
         %   i = |   0    |    1    |    2    |    3    |    4    |    5    |    6   |  ee  |
-           AL = [       0,     pi/2,        0,     pi/2,    -pi/2,     pi/2,       0,  -0  ];
-            A = [       0,        0,     0.15,     0.07,        0,        0,       0,  -0  ];
-            D = [   -0   ,     0.06,        0,        0,     0.13,        0,   0.031, 0.064];
-           TH = [   -0   ,        0,        0,     pi/2,        0,        0,       0,     0];
+        AL = [       0,     pi/2,        0,     pi/2,    -pi/2,     pi/2,       0,  -0  ];
+        A  = [       0,        0,     0.15,     0.07,        0,        0,       0,  -0  ];
+        D  = [   -0   ,     0.06,        0,        0,     0.13,        0,   0.031, 0.064];
+        TH = [   -0   ,        0,        0,     pi/2,        0,        0,       0,     0];
         %  th = |   -    |    th1  |   th2   |   th3   |   th4   |   th5   |   th6  | thee |
         
-        % Robot's urdf still not available
-        if level == 0 && real_robot
-            robot  = importrobot( "robot_urdf/custom_man.urdf" );
-            config = robot.homeConfiguration;
-        end
-    
     else
         fprintf( "Undefined manipulator selected. Terminating." )
         exit
     
     end
 
-    % Export variables to workspace
+    % Set table dimensions
+    tablePosition = [0.0, 0.0, 0.0];
+    tableHeight   = 0.4;
+    tableWidth    = 1.5;
+    tableLength   = 0.7;
+
+    % Eventual transformation between World Reference Frame and Frame 0
+    % Create a base link with the desired position and orientation
+    % (on top and in the center of the table)
+    basePosition    = [tablePosition(1), tablePosition(2), tableHeight];  % Position in [x, y, z]
+    baseOrientation = [0, 0, 0];  % Orientation in [roll, pitch, yaw]
+    
+    % Define robot's world-to-base transformations
+    if nargin > 1  % multi-robot setup
+        robot_base_transforms = {
+            eul2tform(baseOrientation, "XYZ") * trvec2tform(basePosition + [0, -0.5, 0]);  % Robot 1 position
+            eul2tform(baseOrientation, "XYZ") * trvec2tform(basePosition + [0,  0.5, 0])   % Robot 2 position
+        };
+    else
+        robot_base_transforms = {eul2tform([0, 0, 0], "XYZ") * trvec2tform([0, 0, 0.5])};
+    end
+    
+    Trf_0 = robot_base_transforms{robot_id};
+    if level == 0 && real_robot
+        disp("Loading robot " + manipulator + " " + num2str(robot_id))
+        [robot, config] = get_robot( manipulator, Trf_0 );
+    end
+
+    % Export variables to workspace ===============================================================
     varnames = who;
     for i = 1:length(varnames)
         assignin( 'caller', varnames{i}, eval(varnames{i}) );
