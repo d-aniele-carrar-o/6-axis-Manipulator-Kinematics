@@ -1,15 +1,4 @@
 function parameters( level )
-    if level == 0
-        addpath("utils/")
-        addpath("plot_utils/")
-        addpath("3_link_manipulators/")
-        addpath("trajectory_scripts/")
-        addpath("robot_descriptions/")
-        addpath("robot_urdf/")
-        addpath("cpp_src/")
-        addpath("mex_compiled_functions/")
-    end
-
     % Debug mode
     verbose = false;
     
@@ -25,9 +14,14 @@ function parameters( level )
     max_vel = 10;
     max_acc = 10;
     
-    space      = "task";     % ["joint", "task"]
-    kinematics = "IDK";      % ["IK", "IDK"]
-    traj_type  = "quintic";  % ["LSPB", "cubic", "quintic"]
+    space      = "task";
+    % ["joint", "task"]
+
+    kinematics = "IDK";
+    % ["IK", "IDK"]
+
+    traj_type  = "cubic";
+    % ["LSPB", "cubic", "quintic"]
     
     if kinematics == "IDK"
         % Precision of final pose - determines when the loop ends (IDK)
@@ -44,7 +38,7 @@ function parameters( level )
     
     
     % Manipulator in use for which compute some kinematics (for now just ABB and UR5)
-    manipulator = "UR5";  % ["ABB", "UR5", "custom"]
+    manipulator = "UR3e";  % ["ABB", "UR5", "custom"]
     
     % Use the robot's urdf to show the simulation, if false the simulations uses matlab's plot3
     real_robot  = true;
@@ -53,7 +47,8 @@ function parameters( level )
     gripper     = false;
     
     % Eventual transformation between World Reference Frame and Frame 0
-    Trf_0       = eye(4);
+    % Trf_0       = eye(4);
+    Trf_0 = eul2tform([0, 0, 0], "XYZ") * trvec2tform([0, 0, 0.5]);
     
     
     % Load manipulator's D-H parameters and other useful parameters to compute kinematics
@@ -89,8 +84,8 @@ function parameters( level )
         %   i = |   0    |    1    |    2    |    3    |    4    |    5    |    6   |   ee   |
            AL = [       0,     pi/2,        0,        0,     pi/2,    -pi/2,       0,   -0   ];
             A = [       0,        0,   -0.425, -0.39225,        0,        0,       0,   -0   ];
-            D = [   -0   , 0.089159,        0,        0,  0.10915,  0.09465,  0.0823,  0.1475];
-           TH = [   -0   ,        0,        0,        0,        0,        0,       0,       0];
+            D = [   -0   , 0.089159,        0,        0,  0.10915,  0.09465,  0.0823,  0.0674]; % 0.1475
+           TH = [   -0   ,        0,    -pi/2,        0,    -pi/2,        0,       0,       0];
         %  th = |   -    |    th1  |   th2   |   th3   |   th4   |   th5   |   th6  |   -    |
         
         if level == 0 && real_robot
@@ -99,18 +94,39 @@ function parameters( level )
         end
         gripper = true;
     
+    elseif manipulator == "UR3e"  % ============================================
+        % UR3e D-H parameters
+        %   T :         0->1      1->2      2->3      3->4      4->5      5->6     6->ee
+        %   i = |   0    |    1    |    2    |    3    |    4    |    5    |    6   |   ee   |
+        AL = [       0,     pi/2,        0,        0,     pi/2,    -pi/2,       0,   -0   ];
+        A  = [       0,        0, -0.24355,  -0.2132,        0,        0,       0,   -0   ];
+        D  = [   -0   ,  0.15185,        0,        0,  0.13105,  0.08535,  0.0921,       0];
+        TH = [   -0   ,    -pi/2,    -pi/2,        0,    -pi/2,        0,       0,       0];
+        %  th = |   -    |    th1  |   th2   |   th3   |   th4   |   th5   |   th6  |   -    |
+        
+        if level == 0 && real_robot
+            robot = importrobot( "robot_urdf/ur3e.urdf" );
+            % Set the base transformation
+            setFixedTransform(robot.Bodies{1}.Joint, Trf_0);
+            config = robot.homeConfiguration;
+        end
+        gripper = false;
+    
     elseif manipulator == "custom"  % ======================================
         % Custom manipulator D-H parameters
-        %   T :         0->1      1->2      2->3      3->4      4->5      5->6
-        %   i = |   0    |    1    |    2    |    3    |    4    |    5    |    6   |
-           AL = [       0,     pi/2,        0,     pi/2,    -pi/2,     pi/2,    -0  ];
-            A = [       0,        0,     0.15,     0.07,        0,        0,    -0  ];
-            D = [   -0   ,     0.06,        0,        0,     0.13,        0,   0.031];
-           TH = [   -0   ,        0,     pi/2,        0,        0,        0,       0];
-        %  th = |   -    |    th1  |   th2   |   th3   |   th4   |   th5   |   th6  |
+        %   T :         0->1      1->2      2->3      3->4      4->5      5->6     6->ee
+        %   i = |   0    |    1    |    2    |    3    |    4    |    5    |    6   |  ee  |
+           AL = [       0,     pi/2,        0,     pi/2,    -pi/2,     pi/2,       0,  -0  ];
+            A = [       0,        0,     0.15,     0.07,        0,        0,       0,  -0  ];
+            D = [   -0   ,     0.06,        0,        0,     0.13,        0,   0.031, 0.064];
+           TH = [   -0   ,        0,        0,     pi/2,        0,        0,       0,     0];
+        %  th = |   -    |    th1  |   th2   |   th3   |   th4   |   th5   |   th6  | thee |
         
         % Robot's urdf still not available
-        real_robot = false;
+        if level == 0 && real_robot
+            robot  = importrobot( "robot_urdf/custom_man.urdf" );
+            config = robot.homeConfiguration;
+        end
     
     else
         fprintf( "Undefined manipulator selected. Terminating." )

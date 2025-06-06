@@ -8,7 +8,7 @@ function [time, positions, velocities] = cubic_trajectory( ti, tf, qi, qf )
     if     space == "joint"
         [T, ~, ~]     = get_velocity( qi, qf, T, 0 );
     elseif space == "task"
-        Ti            = direct_kinematics_cpp( qi, AL, A, D, TH );
+        [T_w_e_i, Ti] = direct_kinematics( qi );
         [T, ~, angle] = get_velocity( Ti, qf, T, 0 );
     end
     
@@ -80,7 +80,7 @@ function [time, positions, velocities] = cubic_trajectory( ti, tf, qi, qf )
         while (delta_pos > precision_pos || delta_ang > precision_orient) && (count > 0 || time(end) < T-2*dt)
             % Compute desired position and velocity from selected desired trajectory
             time          = [time, time(end)+dt];
-            fprintf( "computing intermediate viapoints - t=%.4f\n", time(end) )
+            % fprintf( "computing intermediate viapoints - t=%.4f\n", time(end) )
             
             [P, V]        = cubic_polynomial( time(end), ti, ti+T, [ti, Ti(1:3,4)', 0], [ti+T, qf(1:3,4)', angle], zeros(1,5), zeros(1,5) );
             cubic_time    = P(1);
@@ -95,8 +95,8 @@ function [time, positions, velocities] = cubic_trajectory( ti, tf, qi, qf )
             [q_next, limited_q_dot] = inverse_differential_kinematics_cpp( q_curr, Te, Td, vd, J, dt, max_vel );
 
             % Update current end-effector pose
-            last_Te = Te;
-            Te      = direct_kinematics_cpp( q_next, AL, A, D, TH );
+            last_Te     = Te;
+            [T_w_e, Te] = direct_kinematics( q_next );
             
             % Compute position and orientation "distance" from previous position, if below threshold -> stop trajectory
             [delta_pos, delta_ang, delta_pos_last, delta_ang_last] = compute_distance( Te, last_Te, qf );
@@ -109,17 +109,18 @@ function [time, positions, velocities] = cubic_trajectory( ti, tf, qi, qf )
             end
             
             % For debug purposes
-            if verbose
+            if false
                 count
-                limited_q_dot'
-                q_next
+                q_dot_lim = limited_q_dot'
+                next_q = q_next'
                 Te
                 Td
-                vd'
-                [delta_pos, delta_ang]
+                vel_d = vd'
+                pos_err = delta_pos
+                angle_error = delta_ang
                 [delta_pos_last, delta_ang_last]
                 fprintf("-----------------------------------------------------\n")
-                % pause()
+                pause()
             end
             
             % Update current joint configuration

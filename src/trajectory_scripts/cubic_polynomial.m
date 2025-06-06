@@ -14,19 +14,27 @@ function [q_d, q_dot_d] = cubic_polynomial( t, ti, tf, q_i, q_f, q_dot_i, q_dot_
         q_dot_d = q_dot_f;
     else
         % solve the general case with as a linear system:
-        T = [[1, ti, ti^2,   ti^3];
-             [1, tf, tf^2,   tf^3];
-             [0,  1, 2*ti, 3*ti^2];
-             [0,  1, 2*tf, 3*tf^2]
-            ];
+        % T = [[1, ti, ti^2,   ti^3];
+        %      [1, tf, tf^2,   tf^3];
+        %      [0,  1, 2*ti, 3*ti^2];
+        %      [0,  1, 2*tf, 3*tf^2]
+        %     ];
+        % 
+        % % vector containing unknowns [a0, a1, a2, a3] for each field in given
+        % % q_i/q_f (could be [x,y,z] or joint variables [q1,q2,...])
+        % A = T \ [q_i; q_f; q_dot_i; q_dot_f];
+        % 
+        % % compute desired q and q_dot for given time t
+        % q_d     = A(1,:) +   A(2,:)*(t-ti) +   A(3,:)*(t-ti)^2 + A(4,:)*(t-ti)^3;
+        % q_dot_d = A(2,:) + 2*A(3,:)*(t-ti) + 3*A(4,:)*(t-ti)^2;
         
-        % vector containing unknowns [a0, a1, a2, a3] for each field in given
-        % q_i/q_f (could be [x,y,z] or joint variables [q1,q2,...])
-        A = T \ [q_i; q_f; q_dot_i; q_dot_f];
+        H = q_f - q_i;
+        T = tf - ti;
+        a = [q_i; zeros(size(q_i)); 3*H/T^2; -2*H/T^3];
         
-        % compute desired q and q_dot for given time t
-        q_d     = A(1,:) +   A(2,:)*(t-ti) +   A(3,:)*(t-ti)^2 + A(4,:)*(t-ti)^3;
-        q_dot_d = A(2,:) + 2*A(3,:)*(t-ti) + 3*A(4,:)*(t-ti)^2;
+        q_d     = a(1,:) +   a(2,:)*(t-ti) +   a(3,:)*(t-ti)^2 + a(4,:)*(t-ti)^3;
+        q_dot_d = a(2,:) + 2*a(3,:)*(t-ti) + 3*a(4,:)*(t-ti)^2;
+
     end
     
 end

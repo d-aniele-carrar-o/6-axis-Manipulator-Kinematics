@@ -81,7 +81,11 @@ function [qf, handlesR] = simulate( time, positions, gripper_positions, velociti
         tmp  = (Trf_0 * Te(1:4,4))';
         p_ee = tmp(1:3);
         scatter3( p_ee(1), p_ee(2), p_ee(3), 10, 'r.', 'Parent', axs ); hold on;
-        pause()
+        
+        k = waitforbuttonpress;
+        while k ~= 1
+            k = waitforbuttonpress;
+        end
         
         disp("[simulate] Simulation started.")
         for i=2:N

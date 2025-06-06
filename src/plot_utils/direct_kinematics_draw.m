@@ -5,15 +5,35 @@
 %               the first element links to existing axes object
 % - firstTime : if true, draw and save manipulator's configuration and axes; 
 %               if false, update existing manipulator's configuration
-function [Te, handlesR] = direct_kinematics_draw( q, handles, firstTime )
+function [T_w_e, Te, handlesR] = direct_kinematics_draw( robot, config, q, handles, firstTime )
     parameters(1)
 
     % Compute DK
-    Te  = direct_kinematics_cpp( q, AL, A, D, TH );
+    [T_w_e, Te]  = direct_kinematics( q );
     
+    if real_robot
+        config = set_robot_configuration( q, config );
+        if firstTime
+            axs = show( robot, config, "Visuals", "on", "Frames", "on", "FastUpdate", true, "PreservePlot", false );
+        else
+            show( robot, config, "Visuals", "on", "Frames", "on", "FastUpdate", true, "PreservePlot", false, "Parent", handles(1) );
+            axs = handles(1);
+        end
+        handlesR(1) = axs;
+        xlim([-1,1]); ylim([-1,1]); zlim([-0.2,1.2]);
+        view(3); grid on;
+        return
+    end
+
     % Extract axes object for plotting
-    axs = handles(1);
-    
+    if firstTime
+        axs = axes();
+    else
+        axs = handles(1);
+    end
+    xlim([-1,1]); ylim([-1,1]); zlim([-0.2,1.2]);
+    view(3); grid on;
+
     % Number of joint variables
     N   = max(size( q ));
     
