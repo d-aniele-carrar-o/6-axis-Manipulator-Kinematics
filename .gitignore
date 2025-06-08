@@ -3,3 +3,6 @@ src/mex_compiled_functions/*
 src/.vscode
 .DS_Store
 src/.DS_Store
+*.jpg
+*.png
+*.ply

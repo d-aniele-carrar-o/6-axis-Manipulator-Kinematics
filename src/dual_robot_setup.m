@@ -19,7 +19,7 @@ hold on; grid on;
 create_environment( tablePosition, tableLength, tableWidth, tableHeight );
 
 % Initial joint configurations --------------------------------------------------------------------
-q0_left  = [0,  pi/6,  5*pi/6, 0,  pi/2, pi]
+q0_left  = [0,  pi/6,  5*pi/6, 0,  pi/2,  pi]
 q0_right = [0, -pi/6, -5*pi/6, 0, -pi/2, 0.0]
 
 % Set robot configurations
@@ -73,16 +73,22 @@ Tf_r = inv(Trf_0_r) * T_w_o_r
 t1   = 1
 
 % Second viapoint: set second desired configuration/pose (viapoint)
-% Tf2 = Tf + [zeros(3), [0.2; 0.4; 0]; 0,0,0,0]
-% t2 = 2;
+pf2_l = T_w_o_l(1:3,4) + [0; 0; 0.2];
+T2_w_o_l = [Tf_l(1:3,1:3), pf2_l; 0,0,0,1]
+Tf2_l = inv(Trf_0_l) * T2_w_o_l
 
-viapoints_l = [Tf_l];
-viapoints_r = [Tf_r];
-times       = [ti, t1];
+pf2_r = T_w_o_r(1:3,4) + [0; 0; 0.2];
+T2_w_o_r = [Tf_r(1:3,1:3), pf2_r; 0,0,0,1]
+Tf2_r = inv(Trf_0_r) * T2_w_o_r
+
+t2   = 2
+
+viapoints_l = [Tf_l; Tf2_l];
+viapoints_r = [Tf_r; Tf2_r];
+times       = [ti, t1, t2];
 
 % Compute multi-viapoint trajectory for selected times and viapoints for both robots
 [t_l, p_l, v_l] = multipoint_trajectory( q0_left,  viapoints_l, times );
-% t_l = []; p_l = []; v_l = [];
 [t_r, p_r, v_r] = multipoint_trajectory( q0_right, viapoints_r, times );
 
 % Plot manipulator and scatter the positions of the end-effector to highlight trajectory 3D in space
