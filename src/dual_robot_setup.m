@@ -52,6 +52,27 @@ object_centroid = mean(ptCloudObject_world.Location);
 disp('Object centroid position in world frame:');
 disp(object_centroid);
 
+% Find grasp points on the object
+[grasp_points, grasp_orientations] = find_object_grasp_points(ptCloudObject_world);
+
+% Display grasp points
+disp('Grasp points:');
+disp(grasp_points);
+
+% Visualize grasp points
+scatter3(grasp_points(1,1), grasp_points(1,2), grasp_points(1,3), 100, 'g*', 'Parent', axs);
+scatter3(grasp_points(2,1), grasp_points(2,2), grasp_points(2,3), 100, 'g*', 'Parent', axs);
+text(grasp_points(1,1), grasp_points(1,2), grasp_points(1,3) + 0.05, 'Grasp 1', 'Color', 'g', 'Parent', axs);
+text(grasp_points(2,1), grasp_points(2,2), grasp_points(2,3) + 0.05, 'Grasp 2', 'Color', 'g', 'Parent', axs);
+
+% Visualize grasp orientations
+quiver3(grasp_points(1,1), grasp_points(1,2), grasp_points(1,3), ...
+       squeeze(grasp_orientations(1,1,3)), squeeze(grasp_orientations(1,2,3)), squeeze(grasp_orientations(1,3,3)), ...
+       0.05, 'g', 'LineWidth', 2, 'Parent', axs);
+quiver3(grasp_points(2,1), grasp_points(2,2), grasp_points(2,3), ...
+       squeeze(grasp_orientations(2,1,3)), squeeze(grasp_orientations(2,2,3)), squeeze(grasp_orientations(2,3,3)), ...
+       0.05, 'g', 'LineWidth', 2, 'Parent', axs);
+
 % Initial joint configurations --------------------------------------------------------------------
 q0_left  = [-pi/2,  pi/6,  5*pi/6, 0,  pi/2,  pi]
 q0_right = [-pi/2, -pi/6, -5*pi/6, 0, -pi/2, 0.0]
@@ -64,7 +85,7 @@ config_right = set_robot_configuration( q0_right, config_right );
 show( robot_left,  config_left,  "Visuals", "on", "Frames", "on", "FastUpdate", true, "PreservePlot", false, "Parent", axs );
 show( robot_right, config_right, "Visuals", "on", "Frames", "on", "FastUpdate", true, "PreservePlot", false, "Parent", axs );
 
-pause()
+% pause()
 
 % Compute end-effector poses
 parameters(1, 1); % Load parameters for robot 1
@@ -85,7 +106,7 @@ disp('Planning trajectories for both robots...');
 %        /            /
 %       /      R     /
 %    + /     |/     /
-%   Y /      o-    / world reference frame
+%   Y /      . -   / world reference frame
 %  - /            /
 %   /      L     /
 %  /            /
@@ -95,68 +116,70 @@ disp('Planning trajectories for both robots...');
 % Create viapoints for both robots in world reference frame
 ti   = 0
 
-% First viapoint: set first desired configuration/pose (viapoint)
-pf_l = [-0.3; -0.05; tableHeight + 0.1];
-T_w_o_l = [Te_l(1:3,1:3), pf_l; 0,0,0,1]
+% First viapoint: set first desired configuration/pose (viapoint) using grasp points
+% Create transformation matrices for grasp points
+R_grasp_l = squeeze(grasp_orientations(1,:,:));
+pf_l = grasp_points(1,:)';
+
+% Add a small offset in the approach direction (z-axis of grasp orientation)
+% Negative offset to approach from outside the object
+approach_offset = 0.05; % 5cm offset for approach
+pf_l = pf_l - approach_offset * R_grasp_l(:,3);
+T_w_o_l = [R_grasp_l, pf_l; 0,0,0,1]
 Tf_l = inv(Trf_0_l) * T_w_o_l
 
-pf_r = [-0.3;  0.05; tableHeight + 0.1];
-T_w_o_r = [Te_r(1:3,1:3), pf_r; 0,0,0,1]
+R_grasp_r = squeeze(grasp_orientations(2,:,:));
+pf_r = grasp_points(2,:)';
+% Add a small offset in the approach direction
+pf_r = pf_r - approach_offset * R_grasp_r(:,3);
+T_w_o_r = [R_grasp_r, pf_r; 0,0,0,1]
 Tf_r = inv(Trf_0_r) * T_w_o_r
 
 t1   = 1
 
-% Second viapoint: set second desired configuration/pose (viapoint)
-pf2_l = T_w_o_l(1:3,4) + [0; 0; 0.2];
-T2_w_o_l = [Tf_l(1:3,1:3), pf2_l; 0,0,0,1]
+% Second viapoint: move to actual grasp positions (no offset)
+pf2_l = grasp_points(1,:)';
+T2_w_o_l = [R_grasp_l, pf2_l; 0,0,0,1]
 Tf2_l = inv(Trf_0_l) * T2_w_o_l
 
-pf2_r = T_w_o_r(1:3,4) + [0; 0; 0.2];
-T2_w_o_r = [Tf_r(1:3,1:3), pf2_r; 0,0,0,1]
+pf2_r = grasp_points(2,:)';
+T2_w_o_r = [R_grasp_r, pf2_r; 0,0,0,1]
 Tf2_r = inv(Trf_0_r) * T2_w_o_r
 
 t2   = 2
 
-viapoints_l = [Tf_l; Tf2_l];
-viapoints_r = [Tf_r; Tf2_r];
-times       = [ti, t1, t2];
+% Third viapoint: lift object together
+pf3_l = grasp_points(1,:)' + [0; 0; 0.2]; % Lift 20cm up
+T3_w_o_l = [R_grasp_l, pf3_l; 0,0,0,1]
+Tf3_l = inv(Trf_0_l) * T3_w_o_l
 
-% Compute multi-viapoint trajectory for selected times and viapoints for both robots
-[t_l, p_l, v_l] = multipoint_trajectory( q0_left,  viapoints_l, times );
-[t_r, p_r, v_r] = multipoint_trajectory( q0_right, viapoints_r, times );
+pf3_r = grasp_points(2,:)' + [0; 0; 0.2]; % Lift 20cm up
+T3_w_o_r = [R_grasp_r, pf3_r; 0,0,0,1]
+Tf3_r = inv(Trf_0_r) * T3_w_o_r
 
-% Plot manipulator and scatter the positions of the end-effector to highlight trajectory 3D in space
-p_ee_l = Trf_0_l(1:3,4);
-p_ee_r = Trf_0_r(1:3,4);
-scatter3( p_ee_l(1), p_ee_l(2), p_ee_l(3), 10, 'r.', 'Parent', axs ); hold on;
-scatter3( p_ee_r(1), p_ee_r(2), p_ee_r(3), 10, 'b.', 'Parent', axs ); hold on;
+t3   = 3
 
-disp("Press button to start simulation..")
-k = waitforbuttonpress;
-while k ~= 1
-    k = waitforbuttonpress;
-end
+viapoints_l = [Tf_l];
+viapoints_r = [Tf_r];
+times       = [ti, t1];
 
-disp("[simulate] Simulation started.")
-for i=2:max(size( p_l, 1 ), size( p_r, 1 ))
-    if i <= size( p_l, 1 )
-        config_left = set_robot_configuration( p_l(i,:), config_left );
-        show( robot_left, config_left, "Visuals", "on", "Frames", "off", "FastUpdate", true, "PreservePlot", false, "Parent", axs ); hold on;
-        [Te_w_e_left,  Te_l] = direct_kinematics( p_l(i,1:6), 1 );
-        p_ee_l = Te_w_e_left(1:3,4);
-        if (mod(i, 5) == 0)
-            scatter3( p_ee_l(1), p_ee_l(2), p_ee_l(3), 10, 'r.', 'Parent', axs ); hold on;
-        end
-    end
+% Compute multi-viapoint trajectory for selected times and viapoints for both robots --------------
+% First: compute the trajectory to the pre-grasp poses (they might take different amount of time 
+%        and we need to make sure that the steps after are completely synchronous)
+[t_l_appr, p_l_appr, v_l_appr] = multipoint_trajectory( q0_left,  viapoints_l, times );
+[t_r_appr, p_r_appr, v_r_appr] = multipoint_trajectory( q0_right, viapoints_r, times );
 
-    if i <= size( p_r, 1 )
-        config_right = set_robot_configuration( p_r(i,:), config_right );
-        show( robot_right, config_right, "Visuals", "on", "Frames", "off", "FastUpdate", true, "PreservePlot", false, "Parent", axs ); hold on;
-        [Te_w_e_right,  Te_r] = direct_kinematics( p_r(i,1:6), 2 );
-        p_ee_r = Te_w_e_right(1:3,4);
-        if (mod(i, 5) == 0)
-            scatter3( p_ee_r(1), p_ee_r(2), p_ee_r(3), 10, 'b.', 'Parent', axs ); hold on;
-        end
-    end
-    waitfor( rate );
-end
+viapoints_l = [Tf2_l; Tf3_l];
+viapoints_r = [Tf2_r; Tf3_r];
+times       = [t1, t2, t3];
+
+% Second: compute trajectory for the following pieces of the task, as the two manipulators will now 
+%         be now synchronous
+[t_l, p_l, v_l] = multipoint_trajectory( p_l_appr(end,:),  viapoints_l, times );
+[t_r, p_r, v_r] = multipoint_trajectory( p_r_appr(end,:), viapoints_r, times );
+
+% Run the simulation ------------------------------------------------------------------------------
+[qf, axs] = simulate_dual({robot_left, robot_right}, {config_left, config_right}, ...
+                          {Trf_0_l, Trf_0_r}, {p_l_appr, p_r_appr}, axs);
+[qf, axs] = simulate_dual({robot_left, robot_right}, {config_left, config_right}, ...
+                          {Trf_0_l, Trf_0_r}, {p_l, p_r}, axs);
