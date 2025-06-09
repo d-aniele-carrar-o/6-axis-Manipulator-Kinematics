@@ -16,18 +16,52 @@ Trf_0_r      = Trf_0;
 % Create environment for multi-robot setup --------------------------------------------------------
 figure('Name', 'Dual Robot Workspace');
 hold on; grid on;
-create_environment( tablePosition, tableLength, tableWidth, tableHeight );
+
+tableParams.height = tableHeight;
+tableParams.width = tableWidth;
+tableParams.length = tableLength;
+
+axs = create_environment( tablePosition, tableParams );
+
+% --- File Paths ---
+scenePcdPath = '/Users/danielecarraro/Documents/GITHUB/6-axis-Manipulator-Kinematics/pointclouds/pointcloud_25-06-07-11-21-29.ply';
+objectPcdPath = '/Users/danielecarraro/Documents/GITHUB/6-axis-Manipulator-Kinematics/pointclouds/segmented_objects/pointcloud_25-06-07-11-21-29/object_00.ply';
+
+% Calibrate camera and transform object point cloud
+[tform_cam_to_world, ptCloudObject_world, ptCloudRemaining_world] = calibrate_camera( scenePcdPath, objectPcdPath, tableParams, false );
+
+% Display camera transformation
+disp('Camera-to-world transformation:');
+disp(tform_cam_to_world.A);
+
+% Add camera visualization
+plotCamera('AbsolutePose', tform_cam_to_world, 'Size', 0.1, 'Color', 'b', 'Opacity', 0.5, 'Parent', axs);
+text(tform_cam_to_world.Translation(1), tform_cam_to_world.Translation(2), tform_cam_to_world.Translation(3) + 0.1, ...
+    'Camera', 'Color', 'b', 'Parent', axs);
+
+% Add scene point cloud
+pcshow(ptCloudRemaining_world.Location, [0.7 0.7 0.7], 'MarkerSize', 10);
+
+% Add object point cloud
+pcshow(ptCloudObject_world.Location, 'r', 'MarkerSize', 30, 'Parent', axs);
+text(mean(ptCloudObject_world.Location(:,1)), mean(ptCloudObject_world.Location(:,2)), mean(ptCloudObject_world.Location(:,3)) + 0.05, ...
+    'Object', 'Color', 'r', 'Parent', axs);
+
+% Display object position
+object_centroid = mean(ptCloudObject_world.Location);
+disp('Object centroid position in world frame:');
+disp(object_centroid);
 
 % Initial joint configurations --------------------------------------------------------------------
-q0_left  = [0,  pi/6,  5*pi/6, 0,  pi/2,  pi]
-q0_right = [0, -pi/6, -5*pi/6, 0, -pi/2, 0.0]
+q0_left  = [-pi/2,  pi/6,  5*pi/6, 0,  pi/2,  pi]
+q0_right = [-pi/2, -pi/6, -5*pi/6, 0, -pi/2, 0.0]
 
 % Set robot configurations
 config_left  = set_robot_configuration( q0_left, config_left );
 config_right = set_robot_configuration( q0_right, config_right );
 
 % Visualize robots
-axs = show( robot_left, config_left, "Visuals", "on", "Frames", "on", "FastUpdate", true, "PreservePlot", false );
+show( robot_left,  config_left,  "Visuals", "on", "Frames", "on", "FastUpdate", true, "PreservePlot", false, "Parent", axs );
 show( robot_right, config_right, "Visuals", "on", "Frames", "on", "FastUpdate", true, "PreservePlot", false, "Parent", axs );
 
 pause()

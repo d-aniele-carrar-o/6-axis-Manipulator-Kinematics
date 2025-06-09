@@ -23,6 +23,7 @@ addpath(fullfile(project_root, 'src', 'plot_utils'));
 addpath(fullfile(project_root, 'src', '3_link_manipulators'));
 addpath(fullfile(project_root, 'src', 'trajectory_scripts'));
 addpath(fullfile(project_root, 'src', 'kinematics_wrappers'));
+addpath(fullfile(project_root, 'src', 'pointcloud_processing'));
 addpath(fullfile(project_root, 'src', 'robot_descriptions'));
 addpath(fullfile(project_root, 'src', 'robot_urdf'));
 addpath(fullfile(project_root, 'src', 'cpp_src'));

@@ -112,22 +112,22 @@ function parameters( level, robot_id )
     end
 
     % Set table dimensions
-    tablePosition = [0.0, 0.0, 0.0];
     tableHeight   = 0.4;
-    tableWidth    = 1.5;
-    tableLength   = 0.7;
+    tableWidth    = 0.7;
+    tableLength   = 1.5;
+    tablePosition = [0.0, 0.0, tableHeight];
 
     % Eventual transformation between World Reference Frame and Frame 0
     % Create a base link with the desired position and orientation
     % (on top and in the center of the table)
-    basePosition    = [tablePosition(1), tablePosition(2), tableHeight];  % Position in [x, y, z]
-    baseOrientation = [0, 0, 0];  % Orientation in [roll, pitch, yaw]
+    basePosition    = tablePosition;  % Position in [x, y, z]
+    baseOrientation = [0, 0, 0];      % Orientation in [roll, pitch, yaw]
     
     % Define robot's world-to-base transformations
     if nargin > 1  % multi-robot setup
         robot_base_transforms = {
-            eul2tform(baseOrientation, "XYZ") * trvec2tform(basePosition + [0, -0.4, 0]);  % Robot 1 position
-            eul2tform(baseOrientation, "XYZ") * trvec2tform(basePosition + [0,  0.4, 0])   % Robot 2 position
+            eul2tform(baseOrientation, "XYZ") * trvec2tform(basePosition + [-0.4, 0, 0]);  % Robot 1 position
+            eul2tform(baseOrientation, "XYZ") * trvec2tform(basePosition + [ 0.4, 0, 0])   % Robot 2 position
         };
     else
         robot_base_transforms = {eul2tform([0, 0, 0], "XYZ") * trvec2tform([0, 0, 0.5])};

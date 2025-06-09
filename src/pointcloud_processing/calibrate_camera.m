@@ -1,25 +1,32 @@
-%% MATLAB Script for Camera Calibration and Object Integration using Table Edge
+function [tform_cam_to_world, ptCloudObject_world, ptCloudRemaining_world] = calibrate_camera(scenePcdPath, objectPcdPath, tableParams, showPlots)
+% CALIBRATE_CAMERA Camera calibration and object integration using table edge
 %
-% This revised script implements a scene-based extrinsic camera calibration by
+% This function implements a scene-based extrinsic camera calibration by
 % using a table's plane normal (Z-axis) and a single prominent edge (X-axis).
-% This approach is more robust when the camera does not see the full table.
+% It returns the camera-to-world transformation and transformed object point cloud.
 %
-% Best suited for: A camera view where at least one straight table edge is
-% clearly visible in the point cloud.
+% Inputs:
+%   scenePcdPath - Path to the scene point cloud file
+%   objectPcdPath - Path to the object point cloud file
+%   tableParams - Structure with table parameters (height, width, length)
+%   showPlots - Boolean to control visualization (default: false)
 %
-% Required Toolboxes: Computer Vision Toolbox, Lidar Toolbox, Statistics and Machine Learning Toolbox
+% Outputs:
+%   tform_cam_to_world - Rigid transformation from camera to world frame
+%   ptCloudObject_world - Object point cloud transformed to world frame
 
-clear; close all; clc;
+% Handle optional arguments
+if nargin < 4
+    showPlots = false;
+end
 
-%% =======================================================================
-%  1. SETUP AND PARAMETERS (Same as before)
-%  =======================================================================
-% --- File Paths ---
-scenePcdPath = '/Volumes/Shared_part/realsense_data/pointcloud/pointcloud_25-06-07-11-21-29.ply';
-objectPcdPath = '/Volumes/Shared_part/realsense_data/segmented_objects/pointcloud_25-06-07-11-21-29/object_00.ply';
+% Extract table parameters
+tableHeight = tableParams.height;
+tableWidth = tableParams.width;
+tableLength = tableParams.length;
 
 % --- Calibration Parameters ---
-planeMaxDistance = 0.005;
+planeMaxDistance = 0.004;
 planeReferenceVector = [0, 0, -1]; % Adjust based on your camera's Z-axis direction
 maxAngularDistance = 5;
 
@@ -28,53 +35,46 @@ lineMaxDistance = 0.003; % Max distance from a point to the line (0.5 cm)
 sampleSize = 2;          % Minimum number of points to define a line
 
 % --- World Origin Parameters ---
-% Set to 0 to place origin at table edge (default)
-% Set to a positive value to offset the origin from the edge along Y-axis (in meters)
 % Set to 'auto' to automatically place origin at the middle of the detected table
-worldOriginYOffset = 'auto';  % Options: numeric value (meters) or 'auto'
-
-% --- Table Height Parameters ---
-% Height of the table from the ground in meters
-tableHeight = 0.8;  % Default table height is 0.8 meters
-
-% --- Visualization Parameters ---
-showIntermediatePlots = true;
+worldOriginYOffset = 'auto';
 
 %% =======================================================================
-%  2. LOAD AND PREPROCESS POINT CLOUD (Same as before)
+%  LOAD AND PREPROCESS POINT CLOUD
 %  =======================================================================
-fprintf('Step 2: Loading and preprocessing point cloud %s\n', scenePcdPath);
+fprintf('Loading and preprocessing point cloud %s\n', scenePcdPath);
 ptCloudScene = pcread(scenePcdPath);
 ptCloudObject_cam = pcread(objectPcdPath);
 [ptCloudScene, ~] = pcdenoise(ptCloudScene);
 
-%% Visualize Scene and Object Point Clouds
-figure('Name', 'Scene and Object Visualization', 'Position', [100, 100, 1000, 800]);
-
-% Plot full scene in gray
-pcshow(ptCloudScene.Location, [0.7 0.7 0.7], 'MarkerSize', 15);
-hold on;
-
-% Plot object with larger red points and slight transparency
-object_points = ptCloudObject_cam.Location;
-scatter3(object_points(:,1), object_points(:,2), object_points(:,3), 100, 'r', ...
-    'filled', 'MarkerFaceAlpha', 0.7, 'MarkerEdgeColor', 'none');
-
-% Add a subtle glow effect around object points
-scatter3(object_points(:,1), object_points(:,2), object_points(:,3), 150, ...
-    'MarkerFaceColor', [1 0.6 0.6], 'MarkerFaceAlpha', 0.3, 'MarkerEdgeColor', 'none');
-
-title('Scene Point Cloud with Highlighted Object');
-xlabel('X (m)'); ylabel('Y (m)'); zlabel('Z (m)');
-axis equal; grid on;
-view(30, 25);
-legend({'Scene Points', 'Object Points', 'Object Glow'}, 'Location', 'northeast');
-hold off;
+if showPlots
+    % Visualize Scene and Object Point Clouds
+    figure('Name', 'Scene and Object Visualization', 'Position', [100, 100, 1000, 800]);
+    
+    % Plot full scene in gray
+    pcshow(ptCloudScene.Location, [0.7 0.7 0.7], 'MarkerSize', 15);
+    hold on;
+    
+    % Plot object with larger red points and slight transparency
+    object_points = ptCloudObject_cam.Location;
+    scatter3(object_points(:,1), object_points(:,2), object_points(:,3), 100, 'r', ...
+        'filled', 'MarkerFaceAlpha', 0.7, 'MarkerEdgeColor', 'none');
+    
+    % Add a subtle glow effect around object points
+    scatter3(object_points(:,1), object_points(:,2), object_points(:,3), 150, ...
+        'MarkerFaceColor', [1 0.6 0.6], 'MarkerFaceAlpha', 0.3, 'MarkerEdgeColor', 'none');
+    
+    title('Scene Point Cloud with Highlighted Object');
+    xlabel('X (m)'); ylabel('Y (m)'); zlabel('Z (m)');
+    axis equal; grid on;
+    view(30, 25);
+    legend({'Scene Points', 'Object Points', 'Object Glow'}, 'Location', 'northeast');
+    hold off;
+end
 
 %% =======================================================================
-%  3. DETECT TABLE PLANE (Same as before)
+%  DETECT TABLE PLANE
 %  =======================================================================
-fprintf('Step 3: Detecting the table plane...\n');
+fprintf('Detecting the table plane...\n');
 [planeModel, inlierIndices, outlierIndices] = pcfitplane(ptCloudScene, ...
     planeMaxDistance, planeReferenceVector, maxAngularDistance);
 
@@ -83,7 +83,6 @@ if isempty(inlierIndices)
 end
 
 ptCloudTable_cam = select(ptCloudScene, inlierIndices);
-
 ptCloudRemaining_cam = select(ptCloudScene, outlierIndices);
 fprintf('   - Plane found with normal vector: [%.3f, %.3f, %.3f]\n', planeModel.Normal);
 
@@ -94,9 +93,9 @@ Z_cam = normalize(planeModel.Normal, 'norm');
 fprintf('   - Using camera Z-axis: [%.3f, %.3f, %.3f]\n', Z_cam);
 
 %% =======================================================================
-%  4. DETECT TABLE EDGE VIA ROBUST LINE FITTING (NEW LOGIC)
+%  DETECT TABLE EDGE VIA ROBUST LINE FITTING
 %  =======================================================================
-fprintf('Step 4: Detecting table edge line using RANSAC...\n');
+fprintf('Detecting table edge line using RANSAC...\n');
 
 % Project table points onto the fitted plane to work in 2D
 tablePoints3D_cam = ptCloudTable_cam.Location;
@@ -118,7 +117,7 @@ validPoints = validPoints(validIdx, :);
 k = boundary(validPoints(:,1), validPoints(:,2), 0.9);
 boundaryPoints3D = validPoints(k,:);
 
-if showIntermediatePlots
+if showPlots
     figure;
     pcshow(ptCloudTable_cam);
     hold on;
@@ -129,6 +128,7 @@ end
 
 % Use RANSAC to find the best straight line among the boundary points
 % This is robust to curves and noise.
+addpath(fullfile(fileparts(mfilename('fullpath')), '.'));  % Add current directory to path
 [lineModel, inlierIdx] = ransac(boundaryPoints3D, @(pts) fitLine3d(pts(:,1),pts(:,2),pts(:,3)), ...
     @(model, pts) distPointToLine3d(pts, model), sampleSize, lineMaxDistance, 'MaxNumTrials', 1000);
 
@@ -148,7 +148,7 @@ end
 
 fprintf('   - Edge line found with direction vector: [%.3f, %.3f, %.3f]\n', X_cam);
 
-if showIntermediatePlots
+if showPlots
     figure;
     pcshow(boundaryPoints3D, 'MarkerSize', 50);
     hold on;
@@ -161,11 +161,10 @@ if showIntermediatePlots
     hold off;
 end
 
-
 %% =======================================================================
-%  5. COMPUTE THE RIGID TRANSFORMATION FROM AXES (NEW LOGIC)
+%  COMPUTE THE RIGID TRANSFORMATION FROM AXES
 %  =======================================================================
-fprintf('Step 5: Computing the camera-to-world transformation from axes...\n');
+fprintf('Computing the camera-to-world transformation from axes...\n');
 
 % We have Z_cam (from plane) and X_cam (from edge line).
 % We can now compute Y_cam to form a right-handed coordinate system.
@@ -178,24 +177,20 @@ R_cam_to_world = R_cam_to_world';      % The transpose rotates camera axes TO wo
 
 fprintf('   - Table height from ground: %.2f m\n', tableHeight);
 
-% Now, find the translation. We define the world origin based on the detected edge line
-% and the specified Y-offset parameter.
-P_cam_origin = mean(edgeInlierPoints, 1);
-
 % Calculate the Y-offset for the world origin
 if ischar(worldOriginYOffset) && strcmpi(worldOriginYOffset, 'auto')
     % Automatically determine table width and place origin at the middle
     % Project all table points onto the XY plane of our new coordinate system
-    tablePoints_projected = (R_cam_to_world * (tablePoints3D_cam - P_cam_origin)')';
+    tablePoints_projected = (R_cam_to_world * (tablePoints3D_cam - planeOrigin_cam)')';
     
     % Find the extent of the table in the Y direction
     minY = min(tablePoints_projected(:, 2));
     maxY = max(tablePoints_projected(:, 2));
-    tableWidth = maxY - minY;
+    detectedTableWidth = maxY - minY;
     
     % Simply negate the Y-offset to move into the table instead of away from it
-    yOffset = -tableWidth / 2;
-    fprintf('   - Auto-detected table width: %.3f m\n', tableWidth);
+    yOffset = -detectedTableWidth / 2;
+    fprintf('   - Auto-detected table width: %.3f m\n', detectedTableWidth);
     fprintf('   - Setting Y-offset to table middle: %.3f m\n', yOffset);
 elseif isnumeric(worldOriginYOffset)
     % Use the user-specified Y-offset
@@ -209,8 +204,9 @@ end
 
 % Apply the Y-offset to create the world origin
 % The origin is at the center of the table (X=0, Y=offset) but at ground level (Z=0)
-% Table height is positive in Z direction (table is above ground)
-P_world_origin = [0, yOffset, 0]; % Offset along Y-axis and positive Z-axis
+% Table is at Z=tableHeight in world frame
+P_cam_origin = mean(edgeInlierPoints, 1);
+P_world_origin = [0, yOffset, tableHeight]; % Origin at ground level (Z=0)
 
 % The transformation equation is: P_world = R * P_cam + T
 % So, T = P_world_origin' - R * P_cam_origin'
@@ -224,58 +220,51 @@ cam_pos_world = -R_cam_to_world * T_cam_to_world;
 fprintf('   - Camera position in world frame: [%.3f, %.3f, %.3f]\n', cam_pos_world);
 
 fprintf('   - Transformation successfully computed from axes:\n');
-T_c_w = tform_cam_to_world.A
-
+disp(tform_cam_to_world.A);
 
 %% =======================================================================
-%  6. TRANSFORM OBJECTS AND VISUALIZE THE FINAL SCENE (Same as before)
+%  TRANSFORM OBJECTS AND VISUALIZE THE FINAL SCENE
 %  =======================================================================
-fprintf('Step 6: Transforming objects and visualizing the final scene...\n');
+fprintf('Transforming objects to world frame...\n');
 
 % Transform all point clouds to the new world frame
 ptCloudObject_world = pctransform(ptCloudObject_cam, tform_cam_to_world);
 ptCloudRemaining_world = pctransform(ptCloudRemaining_cam, tform_cam_to_world);
 ptCloudTable_world = pctransform(ptCloudTable_cam, tform_cam_to_world);
 
-% Create the final visualization
-figure('Name', 'Final Calibrated Simulation Scene (Edge-Based)', 'Position', [100, 100, 1000, 800]);
-
-% Create a simulated table surface (1m x 0.6m centered at world origin)
-tableWidth = 0.6;  % Width in Y direction
-tableLength = 1.0; % Length in X direction
-[X, Y] = meshgrid([-tableLength/2:0.05:tableLength/2], [-tableWidth/2:0.05:tableWidth/2]);
-Z = zeros(size(X)) + tableHeight;  % Table is at Z=tableHeight in world frame
-tableSurface = surf(X, Y, Z, 'FaceColor', [0.8 0.7 0.6], 'FaceAlpha', 0.3, 'EdgeColor', 'none');
-
-hold on;
-ax = pcshow(ptCloudTable_world.Location, 'y', 'MarkerSize', 20);
-pcshow(ptCloudRemaining_world.Location, [0.7 0.7 0.7], 'MarkerSize', 20);
-pcshow(ptCloudObject_world.Location, 'r', 'MarkerSize', 50);
-
-% Plot the camera's position and orientation in the world frame
-plotCamera('AbsolutePose', tform_cam_to_world, 'Size', 0.1, 'Color', 'b', 'Opacity', 0.2);
-
-% Add coordinate frame axes for clarity
-plot3([0 0.2], [0 0], [0 0], 'r-', 'LineWidth', 3); text(0.2, 0.01, 0, 'World X', 'Color', 'r');
-plot3([0 0], [0 0.2], [0 0], 'g-', 'LineWidth', 3); text(0, 0.21, 0, 'World Y', 'Color', 'g');
-plot3([0 0], [0 0], [0 0.2], 'b-', 'LineWidth', 3); text(0, 0.01, 0.2, 'World Z', 'Color', 'b');
-
-% Visualize the table edge, offset origin, and table height
-if isnumeric(worldOriginYOffset) && worldOriginYOffset > 0 || ischar(worldOriginYOffset)
-    % Draw a line from the edge to the origin to show the offset
-    plot3([0 0], [0 yOffset], [0 0], 'm--', 'LineWidth', 2);
-    text(0, yOffset/2, 0.02, sprintf('Y-Offset: %.3f m', yOffset), 'Color', 'm');
+if showPlots
+    % Create the final visualization
+    figure('Name', 'Final Calibrated Simulation Scene (Edge-Based)', 'Position', [100, 100, 1000, 800]);
+    
+    % Create a simulated table surface (tableLength x tableWidth centered at world origin)
+    [X, Y] = meshgrid([-tableLength/2:0.05:tableLength/2], [-tableWidth/2:0.05:tableWidth/2]);
+    Z = zeros(size(X)) + tableHeight;  % Table is at Z=tableHeight in world frame
+    surf(X, Y, Z, 'FaceColor', [0.8 0.7 0.6], 'FaceAlpha', 0.3, 'EdgeColor', 'none'); hold on;
+    
+    pcshow(ptCloudTable_world.Location, 'y', 'MarkerSize', 20); hold on;
+    pcshow(ptCloudRemaining_world.Location, [0.7 0.7 0.7], 'MarkerSize', 20); hold on;
+    pcshow(ptCloudObject_world.Location, 'r', 'MarkerSize', 50); hold on;
+    
+    % Plot the camera's position and orientation in the world frame
+    plotCamera('AbsolutePose', tform_cam_to_world, 'Size', 0.1, 'Color', 'b', 'Opacity', 0.2); hold on;
+    
+    % Add coordinate frame axes for clarity
+    plot3([0 0.2], [0 0], [0 0], 'r-', 'LineWidth', 3); text(0.2, 0.01, 0, 'World X', 'Color', 'r'); hold on;
+    plot3([0 0], [0 0.2], [0 0], 'g-', 'LineWidth', 3); text(0, 0.21, 0, 'World Y', 'Color', 'g'); hold on;
+    plot3([0 0], [0 0], [0 0.2], 'b-', 'LineWidth', 3); text(0, 0.01, 0.2, 'World Z', 'Color', 'b'); hold on;
+    
+    % Visualize the table height (from ground up to table)
+    plot3([0 0], [yOffset yOffset], [0 tableHeight], 'k--', 'LineWidth', 2); hold on;
+    text(0.02, yOffset, tableHeight/2, sprintf('Table Height: %.2f m', tableHeight), 'Color', 'k'); hold on;
+    
+    % Final plot adjustments
+    title('Final Calibrated Scene (Edge-Based)');
+    xlabel('X (m)'); ylabel('Y (m)'); zlabel('Z (m)');
+    axis equal; grid on; view(30, 25);
+    legend('Table Surface', 'Table Points', 'Remaining Scene', 'Transformed Object', 'Location', 'northeast');
 end
 
-% Visualize the table height (from ground up to table)
-plot3([0 0], [yOffset yOffset], [0 0], 'k--', 'LineWidth', 2);
-text(0.02, yOffset, 0, sprintf('Table Height: %.2f m', tableHeight), 'Color', 'k');
+fprintf('--- Calibration Complete ---\n');
+end
 
-% Final plot adjustments
-title('Final Calibrated Scene (Edge-Based)');
-xlabel('X (m)'); ylabel('Y (m)'); zlabel('Z (m)');
-axis equal; grid on; view(30, 25);
-legend({'Table Surface', 'Table Points', 'Remaining Scene', 'Transformed Object'}, 'Location', 'northeast');
-hold off;
-
-fprintf('--- Calibration and Visualization Complete ---\n');
+% Note: fitLine3d and distPointToLine3d are external functions
