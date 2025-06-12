@@ -5,7 +5,9 @@
 parameters(0)
 
 % Initial joint configuration
-q0 = [0, -pi/6, -pi/2, -pi/3, -pi/2, 0.0]
+% q0 = [0, -pi/6, -pi/2, -pi/3, -pi/2, 0.0]
+% q0 = [pi, -pi/2, 0, -pi/2, -pi/2, 0]
+q0 = [-pi/2, -2*pi/3, -2*pi/3, -2*pi/3, -pi/2, 0]
 
 % Compute end-effector pose
 [T_w_e, Te] = direct_kinematics( q0 )

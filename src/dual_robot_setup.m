@@ -26,6 +26,8 @@ axs = create_environment( tablePosition, tableParams );
 % --- File Paths ---
 scenePcdPath = '/Users/danielecarraro/Documents/GITHUB/6-axis-Manipulator-Kinematics/pointclouds/pointcloud_25-06-07-11-21-29.ply';
 objectPcdPath = '/Users/danielecarraro/Documents/GITHUB/6-axis-Manipulator-Kinematics/pointclouds/segmented_objects/pointcloud_25-06-07-11-21-29/object_00.ply';
+% scenePcdPath = '/Volumes/Shared_part/realsense_data/pointcloud/pointcloud_25-06-12-12-05-30.ply';
+% objectPcdPath = '/Volumes/Shared_part/realsense_data/segmented_objects/25-06-12-12-05-30/object_02.ply';
 
 % Calibrate camera and transform object point cloud
 [tform_cam_to_world, ptCloudObject_world, ptCloudRemaining_world] = calibrate_camera( scenePcdPath, objectPcdPath, tableParams, false );
@@ -74,20 +76,26 @@ quiver3(grasp_points(2,1), grasp_points(2,2), grasp_points(2,3), ...
        0.05, 'g', 'LineWidth', 2, 'Parent', axs);
 
 % Initial joint configurations --------------------------------------------------------------------
-q0_left  = [-pi/2,  pi/6,  5*pi/6, 0,  pi/2,  pi]
-q0_right = [-pi/2, -pi/6, -5*pi/6, 0, -pi/2, 0.0]
+q0_left  = [ pi/2,   -pi/3,  2*pi/3,   -pi/3,  pi/2, 0]
+q0_right = [-pi/2, -2*pi/3, -2*pi/3, -2*pi/3, -pi/2, 0]
 
 % Set robot configurations
-config_left  = set_robot_configuration( q0_left, config_left );
+config_left  = set_robot_configuration( q0_left,  config_left );
 config_right = set_robot_configuration( q0_right, config_right );
 
 % Visualize robots
 show( robot_left,  config_left,  "Visuals", "on", "Frames", "on", "FastUpdate", true, "PreservePlot", false, "Parent", axs );
 show( robot_right, config_right, "Visuals", "on", "Frames", "on", "FastUpdate", true, "PreservePlot", false, "Parent", axs );
 
-% pause()
+% Add text labels for each robot on the table surface
+left_base_pos = Trf_0_l(1:3,4);
+right_base_pos = Trf_0_r(1:3,4);
+text(left_base_pos(1), left_base_pos(2), tableHeight + 0.01, 'Robot Left', ...
+    'Color', 'b', 'FontSize', 12, 'FontWeight', 'bold', 'HorizontalAlignment', 'center', 'Parent', axs);
+text(right_base_pos(1), right_base_pos(2), tableHeight + 0.01, 'Robot Right', ...
+    'Color', 'r', 'FontSize', 12, 'FontWeight', 'bold', 'HorizontalAlignment', 'center', 'Parent', axs);
 
-% Compute end-effector poses
+% Compute end-effector poses 
 parameters(1, 1); % Load parameters for robot 1
 [Te_w_e_left,  Te_l] = direct_kinematics( q0_left, 1 );
 
@@ -95,10 +103,20 @@ parameters(1, 2); % Load parameters for robot 2
 [Te_w_e_right, Te_r] = direct_kinematics( q0_right, 2 );
 
 % Display end-effector positions
-disp('Robot left end-effector pose (wrt world frame):');
+disp('Robot left end-effector pose (wTee):');
 disp(Te_w_e_left);
-disp('Robot right end-effector pose (wrt world frame):');
+disp('Robot left end-effector pose (bTee):');
+disp(Te_l)
+disp('--------------------------------------')
+disp('Robot right end-effector pose (wTee):');
 disp(Te_w_e_right);
+disp('Robot right end-effector pose (bTee):');
+disp(Te_r)
+disp('--------------------------------------')
+
+
+view(90, 30); % Set frontal view of the table
+pause()
 
 % Create trajectories for both robots -------------------------------------------------------------
 disp('Planning trajectories for both robots...');

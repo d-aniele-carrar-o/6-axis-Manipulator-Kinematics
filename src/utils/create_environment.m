@@ -7,7 +7,7 @@ function [axs] = create_environment(tablePosition, tableParams)
     zlimits = [-0.2,1.2];
     xlim(xlimits); ylim(ylimits); zlim(zlimits);
     xlabel('X [m]'); ylabel('Y [m]'); zlabel('Z [m]');
-    view(3);
+    view(0, 30); % Frontal view (looking along Y-axis toward the origin)
     
     % Add coordinate frame axes for clarity
     plot3([0 0.2], [0 0], [0 0], 'r-', 'LineWidth', 3, 'Parent', axs); text(0.2, 0.01, 0, 'World X', 'Color', 'r', 'Parent', axs);

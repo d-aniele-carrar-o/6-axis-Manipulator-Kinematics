@@ -51,9 +51,16 @@ function [grasp_points, grasp_orientations] = find_object_grasp_points(ptCloud)
     x_length = x_max - x_min;
     y_length = y_max - y_min;
     
-    % For side grasping in XY plane, we need to determine which horizontal dimension is smaller
-    if x_length <= y_length
-        % Grasp along the X-axis (shortest horizontal dimension)
+    % Define world Y axis
+    world_y = [0, 1, 0]';
+    
+    % Calculate alignment of object axes with world Y axis
+    x_alignment = abs(dot(x_axis, world_y));
+    y_alignment = abs(dot(y_axis, world_y));
+    
+    % Choose the axis that is most aligned with world Y axis
+    if x_alignment >= y_alignment
+        % Grasp along the X-axis (most aligned with world Y)
         grasp_points = zeros(2, 3);
         grasp_points(1, :) = centroid + (x_min * x_axis');
         grasp_points(2, :) = centroid + (x_max * x_axis');
@@ -66,8 +73,10 @@ function [grasp_points, grasp_orientations] = find_object_grasp_points(ptCloud)
         grasp_orientations = zeros(2, 3, 3);
         grasp_orientations(1, :, 3) = x_axis;  % Z-axis points inward (along X)
         grasp_orientations(2, :, 3) = -x_axis; % Z-axis points inward (along -X)
+        
+        fprintf('Grasping along object X-axis (alignment with world Y: %.3f)\n', x_alignment);
     else
-        % Grasp along the Y-axis (shortest horizontal dimension)
+        % Grasp along the Y-axis (most aligned with world Y)
         grasp_points = zeros(2, 3);
         grasp_points(1, :) = centroid + (y_min * y_axis');
         grasp_points(2, :) = centroid + (y_max * y_axis');
@@ -80,6 +89,8 @@ function [grasp_points, grasp_orientations] = find_object_grasp_points(ptCloud)
         grasp_orientations = zeros(2, 3, 3);
         grasp_orientations(1, :, 3) = y_axis;  % Z-axis points inward (along Y)
         grasp_orientations(2, :, 3) = -y_axis; % Z-axis points inward (along -Y)
+        
+        fprintf('Grasping along object Y-axis (alignment with world Y: %.3f)\n', y_alignment);
     end
     
     % Complete the orientation matrices with orthogonal x and y axes

@@ -28,6 +28,7 @@ tableLength = tableParams.length;
 % --- Calibration Parameters ---
 planeMaxDistance = 0.004;
 planeReferenceVector = [0, 0, -1]; % Adjust based on your camera's Z-axis direction
+% planeReferenceVector = [0, -1/2, -sqrt(3)/2];
 maxAngularDistance = 5;
 
 % --- RANSAC Line Fitting Parameters ---
@@ -134,19 +135,18 @@ addpath(fullfile(fileparts(mfilename('fullpath')), '.'));  % Add current directo
 
 edgeInlierPoints = boundaryPoints3D(inlierIdx, :);
 
-% Extract the direction vector of the line, which is our X-axis
-X_cam = normalize(lineModel(4:6), 'norm');
+% Extract the direction vector of the line, which is our Y-axis (instead of X-axis)
+Y_cam = normalize(lineModel(4:6), 'norm');
 
-% Ensure the X-axis is perfectly perpendicular to the Z-axis
-X_cam = normalize(X_cam - dot(X_cam, Z_cam) * Z_cam, 'norm');
+% Ensure the Y-axis is perfectly perpendicular to the Z-axis
+Y_cam = normalize(Y_cam - dot(Y_cam, Z_cam) * Z_cam, 'norm');
 
-% Ensure a consistent direction for the X-axis (e.g., pointing generally "right" in the camera view)
-% This avoids the world flipping 180 degrees between runs.
-if X_cam(1) < 0
-    X_cam = -X_cam;
+% Ensure a consistent direction for the Y-axis
+if Y_cam(2) < 0
+    Y_cam = -Y_cam;
 end
 
-fprintf('   - Edge line found with direction vector: [%.3f, %.3f, %.3f]\n', X_cam);
+fprintf('   - Edge line found with direction vector (Y-axis): [%.3f, %.3f, %.3f]\n', Y_cam);
 
 if showPlots
     figure;
@@ -154,10 +154,10 @@ if showPlots
     hold on;
     pcshow(edgeInlierPoints, 'r', 'MarkerSize', 80);
     % Plot the fitted line
-    linePts = [mean(edgeInlierPoints) - X_cam*0.5; mean(edgeInlierPoints) + X_cam*0.5];
+    linePts = [mean(edgeInlierPoints) - Y_cam*0.5; mean(edgeInlierPoints) + Y_cam*0.5];
     plot3(linePts(:,1), linePts(:,2), linePts(:,3), 'g-', 'LineWidth', 3);
-    title('RANSAC Line Fit to Boundary Points');
-    legend('Boundary Points', 'Line Inliers', 'Fitted Edge Line');
+    title('RANSAC Line Fit to Boundary Points (Y-axis)');
+    legend('Boundary Points', 'Line Inliers', 'Fitted Edge Line (Y-axis)');
     hold off;
 end
 
@@ -166,9 +166,9 @@ end
 %  =======================================================================
 fprintf('Computing the camera-to-world transformation from axes...\n');
 
-% We have Z_cam (from plane) and X_cam (from edge line).
-% We can now compute Y_cam to form a right-handed coordinate system.
-Y_cam = cross(Z_cam, X_cam);
+% We have Z_cam (from plane) and Y_cam (from edge line).
+% We compute X_cam to form a right-handed coordinate system.
+X_cam = cross(Y_cam, Z_cam);
 
 % The rotation matrix is what transforms the [X_cam, Y_cam, Z_cam] basis
 % to the world basis [1,0,0], [0,1,0], [0,0,1].
@@ -177,36 +177,36 @@ R_cam_to_world = R_cam_to_world';      % The transpose rotates camera axes TO wo
 
 fprintf('   - Table height from ground: %.2f m\n', tableHeight);
 
-% Calculate the Y-offset for the world origin
+% Calculate the X-offset for the world origin (changed from Y-offset)
 if ischar(worldOriginYOffset) && strcmpi(worldOriginYOffset, 'auto')
-    % Automatically determine table width and place origin at the middle
+    % Automatically determine table length and place origin at the middle
     % Project all table points onto the XY plane of our new coordinate system
     tablePoints_projected = (R_cam_to_world * (tablePoints3D_cam - planeOrigin_cam)')';
     
-    % Find the extent of the table in the Y direction
-    minY = min(tablePoints_projected(:, 2));
-    maxY = max(tablePoints_projected(:, 2));
-    detectedTableWidth = maxY - minY;
+    % Find the extent of the table in the X direction
+    minX = min(tablePoints_projected(:, 1));
+    maxX = max(tablePoints_projected(:, 1));
+    detectedTableLength = maxX - minX;
     
-    % Simply negate the Y-offset to move into the table instead of away from it
-    yOffset = -detectedTableWidth / 2;
-    fprintf('   - Auto-detected table width: %.3f m\n', detectedTableWidth);
-    fprintf('   - Setting Y-offset to table middle: %.3f m\n', yOffset);
+    % Simply negate the X-offset to move into the table instead of away from it
+    xOffset = detectedTableLength / 2;
+    fprintf('   - Auto-detected table length: %.3f m\n', detectedTableLength);
+    fprintf('   - Setting X-offset to table middle: %.3f m\n', xOffset);
 elseif isnumeric(worldOriginYOffset)
-    % Use the user-specified Y-offset
-    yOffset = -worldOriginYOffset;  % Negate to move into the table
-    fprintf('   - Using user-specified Y-offset: %.3f m\n', yOffset);
+    % Use the user-specified offset (now for X)
+    xOffset = -worldOriginYOffset;  % Negate to move into the table
+    fprintf('   - Using user-specified X-offset: %.3f m\n', xOffset);
 else
     % Default to edge (no offset)
-    yOffset = 0;
-    fprintf('   - Using default Y-offset (table edge): %.3f m\n', yOffset);
+    xOffset = 0;
+    fprintf('   - Using default X-offset (table edge): %.3f m\n', xOffset);
 end
 
-% Apply the Y-offset to create the world origin
-% The origin is at the center of the table (X=0, Y=offset) but at ground level (Z=0)
+% Apply the X-offset to create the world origin
+% The origin is at the center of the table (X=offset, Y=0) but at ground level (Z=0)
 % Table is at Z=tableHeight in world frame
 P_cam_origin = mean(edgeInlierPoints, 1);
-P_world_origin = [0, yOffset, tableHeight]; % Origin at ground level (Z=0)
+P_world_origin = [xOffset, 0, tableHeight]; % Origin at ground level (Z=0)
 
 % The transformation equation is: P_world = R * P_cam + T
 % So, T = P_world_origin' - R * P_cam_origin'
@@ -254,8 +254,8 @@ if showPlots
     plot3([0 0], [0 0], [0 0.2], 'b-', 'LineWidth', 3); text(0, 0.01, 0.2, 'World Z', 'Color', 'b'); hold on;
     
     % Visualize the table height (from ground up to table)
-    plot3([0 0], [yOffset yOffset], [0 tableHeight], 'k--', 'LineWidth', 2); hold on;
-    text(0.02, yOffset, tableHeight/2, sprintf('Table Height: %.2f m', tableHeight), 'Color', 'k'); hold on;
+    plot3([xOffset xOffset], [0 0], [0 tableHeight], 'k--', 'LineWidth', 2); hold on;
+    text(xOffset, 0.02, tableHeight/2, sprintf('Table Height: %.2f m', tableHeight), 'Color', 'k'); hold on;
     
     % Final plot adjustments
     title('Final Calibrated Scene (Edge-Based)');

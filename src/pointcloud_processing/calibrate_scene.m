@@ -15,12 +15,15 @@ clear; close all; clc;
 %  1. SETUP AND PARAMETERS (Same as before)
 %  =======================================================================
 % --- File Paths ---
-scenePcdPath = '/Volumes/Shared_part/realsense_data/pointcloud/pointcloud_25-06-07-11-21-29.ply';
-objectPcdPath = '/Volumes/Shared_part/realsense_data/segmented_objects/pointcloud_25-06-07-11-21-29/object_00.ply';
+% scenePcdPath = '/Volumes/Shared_part/realsense_data/pointcloud/pointcloud_25-06-07-11-21-29.ply';
+% objectPcdPath = '/Volumes/Shared_part/realsense_data/segmented_objects/pointcloud_25-06-07-11-21-29/object_00.ply';
+scenePcdPath = '/Volumes/Shared_part/realsense_data/pointcloud/pointcloud_25-06-12-12-05-30.ply';
+objectPcdPath = '/Volumes/Shared_part/realsense_data/segmented_objects/25-06-12-12-05-30/object_02.ply';
+
 
 % --- Calibration Parameters ---
 planeMaxDistance = 0.005;
-planeReferenceVector = [0, 0, -1]; % Adjust based on your camera's Z-axis direction
+planeReferenceVector = [0, -1/2, -sqrt(3)/2]; % Adjust based on your camera's Z-axis direction
 maxAngularDistance = 5;
 
 % --- RANSAC Line Fitting Parameters ---
@@ -93,6 +96,70 @@ fprintf('   - Plane found with normal vector: [%.3f, %.3f, %.3f]\n', planeModel.
 Z_cam = normalize(planeModel.Normal, 'norm');
 fprintf('   - Using camera Z-axis: [%.3f, %.3f, %.3f]\n', Z_cam);
 
+% Visualize the table plane and its normal vector
+figure('Name', 'Table Plane Detection', 'Position', [100, 100, 1000, 800]);
+
+% Plot the full scene in light gray with transparency
+pcshow(ptCloudScene.Location, [0.8 0.8 0.8], 'MarkerSize', 10);
+hold on;
+
+% Highlight the table points in green
+pcshow(ptCloudTable_cam.Location, [0.2 0.8 0.2], 'MarkerSize', 30);
+
+% Calculate the centroid of the table points for placing the normal vector
+tableCentroid = mean(ptCloudTable_cam.Location, 1);
+
+% Create a small plane patch to visualize the detected plane
+% Calculate the extent of the table points
+minX = min(ptCloudTable_cam.Location(:,1));
+maxX = max(ptCloudTable_cam.Location(:,1));
+minY = min(ptCloudTable_cam.Location(:,2));
+maxY = max(ptCloudTable_cam.Location(:,2));
+
+% Create a smaller representative plane (30% of the actual size)
+planeSize = 0.3;
+planeWidth = planeSize * (maxX - minX);
+planeHeight = planeSize * (maxY - minY);
+
+% Create basis vectors for the plane
+if abs(Z_cam(3)) < 0.9  % If Z_cam is not too close to [0,0,1]
+    temp = cross([0,0,1], Z_cam);
+else
+    temp = cross([1,0,0], Z_cam);
+end
+planeX = normalize(temp, 'norm');
+planeY = normalize(cross(Z_cam, planeX), 'norm');
+
+% Create the corners of the plane patch
+p1 = tableCentroid - (planeWidth/2)*planeX - (planeHeight/2)*planeY;
+p2 = tableCentroid + (planeWidth/2)*planeX - (planeHeight/2)*planeY;
+p3 = tableCentroid + (planeWidth/2)*planeX + (planeHeight/2)*planeY;
+p4 = tableCentroid - (planeWidth/2)*planeX + (planeHeight/2)*planeY;
+
+% Create and plot the plane patch
+planePatch = patch('Vertices', [p1; p2; p3; p4], 'Faces', [1 2 3 4], ...
+                  'FaceColor', [0.2 0.6 0.8], 'FaceAlpha', 0.5, 'EdgeColor', 'b');
+
+% Plot the normal vector (Z_cam) from the centroid
+normalLength = 0.1;  % Length of the normal vector visualization
+quiver3(tableCentroid(1), tableCentroid(2), tableCentroid(3), ...
+       Z_cam(1)*normalLength, Z_cam(2)*normalLength, Z_cam(3)*normalLength, ...
+       'r', 'LineWidth', 3, 'MaxHeadSize', 0.5);
+
+% Add text label for the normal vector
+text(tableCentroid(1) + Z_cam(1)*normalLength, ...
+     tableCentroid(2) + Z_cam(2)*normalLength, ...
+     tableCentroid(3) + Z_cam(3)*normalLength, ...
+     'Z normal', 'Color', 'r', 'FontSize', 12);
+
+title('Detected Table Plane with Normal Vector');
+xlabel('X (m)'); ylabel('Y (m)'); zlabel('Z (m)');
+axis equal; grid on;
+view(30, 25);
+legend({'Scene Points', 'Table Points', 'Plane Patch', 'Normal Vector'}, 'Location', 'northeast');
+hold off;
+
+pause()
 %% =======================================================================
 %  4. DETECT TABLE EDGE VIA ROBUST LINE FITTING (NEW LOGIC)
 %  =======================================================================

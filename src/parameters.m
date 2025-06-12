@@ -71,7 +71,7 @@ function parameters( level, robot_id )
         AL = [       0,     pi/2,        0,        0,     pi/2,    -pi/2,       0,   -0   ];
         A  = [       0,        0, -0.24355,  -0.2132,        0,        0,       0,   -0   ];
         D  = [   -0   ,  0.15185,        0,        0,  0.13105,  0.08535,  0.0921,       0];
-        TH = [   -0   ,    -pi/2,    -pi/2,        0,    -pi/2,        0,       0,       0];
+        TH = [   -0   ,        0,        0,        0,        0,        0,       0,       0];
         %  th = |   -    |    th1  |   th2   |   th3   |   th4   |   th5   |   th6  |   -    |
     
     elseif manipulator == "ABB"  % ================================================================
@@ -112,10 +112,11 @@ function parameters( level, robot_id )
     end
 
     % Set table dimensions
-    tableHeight   = 0.4;
-    tableWidth    = 0.7;
-    tableLength   = 1.5;
+    tableHeight   = 0.6;
+    tableWidth    = 1.5;
+    tableLength   = 0.7;
     tablePosition = [0.0, 0.0, tableHeight];
+    % Robots in the lab are 1.5m apart
 
     % Eventual transformation between World Reference Frame and Frame 0
     % Create a base link with the desired position and orientation
@@ -126,11 +127,11 @@ function parameters( level, robot_id )
     % Define robot's world-to-base transformations
     if nargin > 1  % multi-robot setup
         robot_base_transforms = {
-            eul2tform(baseOrientation, "XYZ") * trvec2tform(basePosition + [-0.4, 0, 0]);  % Robot 1 position
-            eul2tform(baseOrientation, "XYZ") * trvec2tform(basePosition + [ 0.4, 0, 0])   % Robot 2 position
+            eul2tform(baseOrientation, "XYZ") * trvec2tform(basePosition + [0, -0.45, 0]) * eul2tform(baseOrientation + [0, 0, pi], "XYZ");  % Robot LEFT  position
+            eul2tform(baseOrientation, "XYZ") * trvec2tform(basePosition + [0,  0.45, 0])   % Robot RIGHT position
         };
     else
-        robot_base_transforms = {eul2tform([0, 0, 0], "XYZ") * trvec2tform([0, 0, 0.5])};
+        robot_base_transforms = {eul2tform([0, 0, 0], "XYZ") * trvec2tform(basePosition + [0, -0.4, 0])};
     end
     
     Trf_0 = robot_base_transforms{robot_id};

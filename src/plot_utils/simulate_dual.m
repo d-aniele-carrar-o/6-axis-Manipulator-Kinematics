@@ -2,11 +2,11 @@ function [qf, axs] = simulate_dual(robots, configs, transforms, trajectories, ax
     % SIMULATE_DUAL Simulates two robots with given trajectories
     %
     % Inputs:
-    %   robots     - Cell array with {robot_left, robot_right}
-    %   configs    - Cell array with {config_left, config_right}
-    %   transforms - Cell array with {Trf_0_left, Trf_0_right}
+    %   robots       - Cell array with {robot_left, robot_right}
+    %   configs      - Cell array with {config_left, config_right}
+    %   transforms   - Cell array with {Trf_0_left, Trf_0_right}
     %   trajectories - Cell array with {p_left, p_right}
-    %   axs        - Optional axes handle for plotting
+    %   axs          - Optional axes handle for plotting
     
     % Extract individual elements
     robot_left = robots{1};
