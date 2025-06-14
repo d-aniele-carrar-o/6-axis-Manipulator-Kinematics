@@ -18,12 +18,14 @@ else
 end
 
 % Add subfolders
+addpath(fullfile(project_root, 'data'));
 addpath(fullfile(project_root, 'src', 'utils'));
 addpath(fullfile(project_root, 'src', 'plot_utils'));
 addpath(fullfile(project_root, 'src', '3_link_manipulators'));
 addpath(fullfile(project_root, 'src', 'trajectory_scripts'));
 addpath(fullfile(project_root, 'src', 'kinematics'));
 addpath(fullfile(project_root, 'src', 'pointcloud_processing'));
+addpath(fullfile(project_root, 'src', 'keyframes_generation'));
 addpath(fullfile(project_root, 'src', 'robot_descriptions'));
 addpath(fullfile(project_root, 'src', 'robot_urdf'));
 addpath(fullfile(project_root, 'src', 'cpp_src'));
