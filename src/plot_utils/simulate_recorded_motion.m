@@ -25,7 +25,8 @@ tableParams.length = tableLength;
 axs = create_environment(tablePosition, tableParams);
 
 % Read the CSV file with motion data
-data = readtable('/Users/danielecarraro/Documents/VSCODE/master-thesis/YOTO/data/1749729939_motion.csv');
+% data = readtable('/Users/danielecarraro/Documents/VSCODE/master-thesis/YOTO/data/1749729939_motion.csv');
+data = readtable('/Users/danielecarraro/Documents/VSCODE/master-thesis/YOTO/data/1749734485_motion.csv');
 
 % Initial joint configurations
 q0_left  = [pi/2, -pi/3, 2*pi/3, -pi/3, pi/2, 0];
@@ -73,13 +74,13 @@ for i = 1:num_frames
     idx = (i-1)*step + 1;
     
     % Extract pose data for robot 1 (left)
-    pos_rel_l = [-data.x1(idx); -data.y1(idx); data.z1(idx)];
+    pos_rel_l = [-data.x1(idx); data.y1(idx); data.z1(idx)];
     pos_left = Te_l(1:3,4) + pos_rel_l;
     rot_left = Te_l(1:3,1:3) * eul2rotm_custom([data.rx1(idx), data.ry1(idx), data.rz1(idx)]);
     T_left = [rot_left, pos_left; 0 0 0 1];
     
     % Extract pose data for robot 3 (right)
-    pos_rel_r = [-data.x3(idx); -data.y3(idx); data.z3(idx)];
+    pos_rel_r = [-data.x3(idx); data.y3(idx); data.z3(idx)];
     pos_right = Te_r(1:3,4) + pos_rel_r;
     rot_right = Te_r(1:3,1:3) * eul2rotm_custom([data.rx3(idx), data.ry3(idx), data.rz3(idx)]);
     T_right = [rot_right, pos_right; 0 0 0 1];

@@ -21,3 +21,11 @@ writetable(downsampled_keyframes, 'keyframe_indices_downsampled.csv');
 fprintf('Created downsampled keyframe indices: %d frames\n', height(downsampled_keyframes));
 fprintf('Original keyframes: %d, Downsampled keyframes: %d\n', ...
     length(original_indices), length(downsampled_indices));
+
+% Display the first few downsampled indices
+disp('First 10 downsampled keyframe indices:');
+if length(downsampled_indices) >= 10
+    disp(downsampled_indices(1:10));
+else
+    disp(downsampled_indices);
+end

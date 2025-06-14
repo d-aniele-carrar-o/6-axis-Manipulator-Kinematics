@@ -3,6 +3,7 @@ import numpy as np
 from scipy.signal import savgol_filter, find_peaks
 from scipy.spatial.transform import Rotation, Slerp
 
+
 def parse_and_restructure_data(filepath: str) -> dict:
     """
     Parses the flat CSV file and restructures it into a dictionary of
@@ -208,6 +209,55 @@ def get_dynamic_events(df: pd.DataFrame, params: dict) -> list:
     
     return list(contact_changes[0])
 
+def filter_similar_keyframes(indices, pos_data, ori_data, pos_threshold=0.01, ori_threshold=0.1):
+    """
+    Filter out keyframes that are too similar to their neighbors based on position and orientation changes.
+    
+    Args:
+        indices: List of keyframe indices
+        pos_data: Position data for all frames (numpy array)
+        ori_data: Orientation data for all frames (list of Rotation objects)
+        pos_threshold: Threshold for position change (in meters)
+        ori_threshold: Threshold for orientation change (in radians)
+        
+    Returns:
+        List of filtered keyframe indices
+    """
+    if len(indices) <= 2:
+        return indices  # Keep at least first and last frame
+    
+    # Always keep first and last indices
+    filtered_indices = [indices[0]]
+    last_kept_pos = pos_data[indices[0]]
+    last_kept_ori = ori_data[indices[0]]
+    
+    # Check each keyframe against the last kept one
+    for i in range(1, len(indices) - 1):
+        idx = indices[i]
+        current_pos = pos_data[idx]
+        current_ori = ori_data[idx]
+        
+        try:
+            # Calculate position and orientation differences
+            pos_diff = np.linalg.norm(current_pos - last_kept_pos)
+            ori_diff = (current_ori.inv() * last_kept_ori).magnitude()
+            
+            # Keep this keyframe if either position or orientation changed significantly
+            if pos_diff > pos_threshold or ori_diff > ori_threshold:
+                filtered_indices.append(idx)
+                last_kept_pos = current_pos
+                last_kept_ori = current_ori
+        except Exception as e:
+            print(f"Warning: Error calculating differences for index {idx}: {e}")
+            # If there's an error, keep the keyframe to be safe
+            filtered_indices.append(idx)
+            last_kept_pos = current_pos
+            last_kept_ori = current_ori
+    
+    # Always add the last index
+    filtered_indices.append(indices[-1])
+    
+    return filtered_indices
 
 def main():
     """
@@ -230,11 +280,15 @@ def main():
         # Dynamic Events
         'force_contact_threshold': 5.0, # Newtons
         # Final Filtering
-        'min_time_separation_sec': 0.25 # seconds
+        'min_time_separation_sec': 0.25, # seconds
+        # Similarity Filtering
+        'pos_similarity_threshold': 0.02,  # meters (2cm)
+        'ori_similarity_threshold': 0.1    # radians (~5.7 degrees)
     }
     
     # --- Load and Preprocess Data ---
-    filepath = '1749729939_motion.csv'
+    # filepath = 'data/1749729939_motion.csv'
+    filepath = 'data/1749734485_motion.csv'
     print(f"Loading and restructuring data from {filepath}...")
     all_robot_data_raw = parse_and_restructure_data(filepath)
     
@@ -302,8 +356,44 @@ def main():
              final_keyframes.append(num_frames - 1)
         else: # Replace the last one if it's too close
             final_keyframes[-1] = num_frames - 1
+    
+    # Store the count after time-based filtering        
+    time_filtered_count = len(final_keyframes)
+    print(f"\nKeyframes after time-based filtering: {time_filtered_count}")
+    
+    # Add additional filtering for similar keyframes
+    # Get position and orientation data for robot 1 (could use any robot)
+    pos_data = all_robot_data_processed[1][['x_filtered', 'y_filtered', 'z_filtered']].values
+    
+    # Convert quaternions to Rotation objects with error handling
+    ori_data = []
+    for q in all_robot_data_processed[1]['quaternion']:
+        try:
+            # Ensure quaternion is valid
+            q_array = np.array(q)
+            if len(q_array) != 4 or np.isnan(q_array).any():
+                # Use identity quaternion for invalid data
+                ori_data.append(Rotation.from_quat([0, 0, 0, 1]))
+            else:
+                ori_data.append(Rotation.from_quat(q_array))
+        except Exception as e:
+            print(f"Warning: Error converting quaternion {q}: {e}")
+            # Use identity quaternion as fallback
+            ori_data.append(Rotation.from_quat([0, 0, 0, 1]))
+    
+    # Filter out keyframes with minimal movement
+    similarity_filtered_keyframes = filter_similar_keyframes(
+        final_keyframes, 
+        pos_data, 
+        ori_data,
+        PARAMS['pos_similarity_threshold'],
+        PARAMS['ori_similarity_threshold']
+    )
+    
+    # Update final keyframes with the similarity filtered ones
+    final_keyframes = similarity_filtered_keyframes
 
-    print(f"\nFinal refined keyframes after filtering: {len(final_keyframes)}")
+    print(f"Final keyframes after similarity filtering: {len(final_keyframes)}")
     print("\n--- FINAL KEYFRAME INDICES ---")
     print(sorted(final_keyframes))
     
@@ -311,11 +401,12 @@ def main():
     keyframe_indices = sorted(final_keyframes)
     
     # Method 1: Save just the indices to a simple CSV file
-    with open('keyframe_indices.csv', 'w') as f:
+    output_kf_filepath = filepath.replace('.csv', '_keyframe_indices.csv')
+    with open(output_kf_filepath, 'w') as f:
         f.write('keyframe_idx\n')  # Header
         for idx in keyframe_indices:
             f.write(f'{idx}\n')
-    print(f"\nKeyframe indices saved to keyframe_indices.csv")
+    print(f"\nKeyframe indices saved to {output_kf_filepath}")
     
     # Method 2: Add a keyframe column to the original CSV
     try:
