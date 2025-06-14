@@ -4,7 +4,7 @@
 % - qi        : initial joint configuration
 % - viapoints : viapoints through which trajectory will pass - could be
 %               expressed in joint space - [6xN] - or task space - [4x4xN]
-% times       : time intervals for each piece of trajectory [N+1] 
+% - times     : time intervals for each piece of trajectory [N+1] 
 function [time, positions, velocities] = multipoint_trajectory( qi, viapoints, times )
     parameters(1)
 

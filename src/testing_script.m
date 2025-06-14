@@ -1,4 +1,4 @@
-% clc; close all;
+clc; close all;
 
 % TESTING SCRIPT FOR DK, IK, IDIFFK, TRAJ GENERATION ==============================================
 % Load parameters
@@ -16,13 +16,11 @@ direct_kinematics_draw( robot, config, q0, NaN, true );
 % Set true to test the solutions of IK
 test_IK = false;
 if test_IK
-    test_Inverse_Kinematics( q0 );
+    test_Inverse_Kinematics( q0, robot, config );
+    pause()
 end
 
 pause()
-
-% Compute Jacobian matrix for manipulator
-% J = Jacobian_cpp( Te, q0, AL, A, D, TH )
 
 % TRAJECTORY GENERATION ---------------------------------------------------------------------------
 % Trajectory initial time and time periods for each piece of trajectory

@@ -22,7 +22,7 @@ addpath(fullfile(project_root, 'src', 'utils'));
 addpath(fullfile(project_root, 'src', 'plot_utils'));
 addpath(fullfile(project_root, 'src', '3_link_manipulators'));
 addpath(fullfile(project_root, 'src', 'trajectory_scripts'));
-addpath(fullfile(project_root, 'src', 'kinematics_wrappers'));
+addpath(fullfile(project_root, 'src', 'kinematics'));
 addpath(fullfile(project_root, 'src', 'pointcloud_processing'));
 addpath(fullfile(project_root, 'src', 'robot_descriptions'));
 addpath(fullfile(project_root, 'src', 'robot_urdf'));
@@ -35,5 +35,7 @@ cd(fullfile(project_root, 'src'));
 clear; clc; close all;
 
 % Run the testing script
+% compile_cpp_code
 % testing_script;
-dual_robot_setup;
+% dual_robot_setup;
+simulate_recorded_motion;

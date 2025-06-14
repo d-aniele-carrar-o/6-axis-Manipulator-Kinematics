@@ -1,6 +1,6 @@
-function [tform_cam_to_world, ptCloudObject_world, ptCloudRemaining_world] = calibrate_camera(scenePcdPath, objectPcdPath, tableParams, showPlots)
+function [tform_cam_to_world, ptCloudObject_world, ptCloudRemaining_world] = calibrate_camera_copy(scenePcdPath, objectPcdPath, tableParams, showPlots)
 % CALIBRATE_CAMERA Camera calibration and object integration using table edge
-%
+
 % This function implements a scene-based extrinsic camera calibration by
 % using a table's plane normal (Z-axis) and a single prominent edge (X-axis).
 % It returns the camera-to-world transformation and transformed object point cloud.
@@ -28,10 +28,11 @@ tableLength = tableParams.length;
 % --- Calibration Parameters ---
 planeMaxDistance = 0.03;
 planeReferenceVector = [0, 0, -1]; % Adjust based on your camera's Z-axis direction
-maxAngularDistance = 10;
+% planeReferenceVector = [0, -1/2, -sqrt(3)/2];
+maxAngularDistance = 5;
 
 % --- RANSAC Line Fitting Parameters ---
-lineMaxDistance = 0.03; % Max distance from a point to the line (0.5 cm)
+lineMaxDistance = 0.01; % Max distance from a point to the line (0.5 cm)
 sampleSize = 2;          % Minimum number of points to define a line
 
 % --- World Origin Parameters ---
@@ -46,7 +47,18 @@ ptCloudScene = pcread(scenePcdPath);
 ptCloudObject_cam = pcread(objectPcdPath);
 [ptCloudScene, ~] = pcdenoise(ptCloudScene);
 
-if false
+% Crop the point cloud in camera X direction (which will be world Y)
+% to remove robot bases and other noise at the edges
+fprintf('Cropping point cloud in camera X direction...\n');
+x_min_crop = -0.5; % -0.5m in camera X direction
+x_max_crop = 0.5;  % 0.5m in camera X direction
+scene_points = ptCloudScene.Location;
+valid_indices = scene_points(:,1) >= x_min_crop & scene_points(:,1) <= x_max_crop;
+ptCloudScene = select(ptCloudScene, valid_indices);
+fprintf('   - Cropped from X=[%.2f, %.2f] m, %d points remaining\n', ...
+    x_min_crop, x_max_crop, sum(valid_indices));
+
+if showPlots
     % Visualize Scene and Object Point Clouds
     figure('Name', 'Scene and Object Visualization', 'Position', [100, 100, 1000, 800]);
     
@@ -105,9 +117,6 @@ dists = vecsToPoints * Z_cam';
 projectedTablePoints3D_cam = tablePoints3D_cam - dists .* Z_cam;
 
 % Find the boundary points of the projected 2D point cloud segment
-% 'boundary' is better than 'convhull' for partial views.
-% We use a shrink factor to get a tight boundary.
-% Convert to double and remove any NaN values
 validPoints = projectedTablePoints3D_cam;
 validPoints = double(validPoints);
 validIdx = ~any(isnan(validPoints), 2);
@@ -115,7 +124,23 @@ validPoints = validPoints(validIdx, :);
 
 % Now call boundary with clean data
 k = boundary(validPoints(:,1), validPoints(:,2), 0.9);
-boundaryPoints3D = validPoints(k,:);
+allBoundaryPoints = validPoints(k,:);
+
+% Filter boundary points to focus on those aligned with camera X-axis
+fprintf('   - Filtering boundary points to find X-aligned edges...\n');
+
+% Find the min and max X values to identify the left and right edges
+minX = min(allBoundaryPoints(:,1));
+maxX = max(allBoundaryPoints(:,1));
+xRange = maxX - minX;
+
+% Select points near the left and right edges (within 20% of the X range)
+leftEdgePoints = allBoundaryPoints(allBoundaryPoints(:,1) < minX + 0.2*xRange, :);
+rightEdgePoints = allBoundaryPoints(allBoundaryPoints(:,1) > maxX - 0.2*xRange, :);
+
+% Combine the left and right edge points
+boundaryPoints3D = [leftEdgePoints; rightEdgePoints];
+fprintf('   - Selected %d boundary points from left and right edges\n', size(boundaryPoints3D, 1));
 
 if showPlots
     figure;
@@ -134,17 +159,31 @@ addpath(fullfile(fileparts(mfilename('fullpath')), '.'));  % Add current directo
 
 edgeInlierPoints = boundaryPoints3D(inlierIdx, :);
 
-% Extract the direction vector of the line, which is our Y-axis (instead of X-axis)
+% Extract the direction vector of the line, which is our Y-axis
 Y_cam = normalize(lineModel(4:6), 'norm');
 
 % Ensure the Y-axis is perfectly perpendicular to the Z-axis
 Y_cam = normalize(Y_cam - dot(Y_cam, Z_cam) * Z_cam, 'norm');
 
-% Ensure a consistent direction for the Y-axis
-if Y_cam(2) < 0
+% Check if the detected line is more aligned with camera X or Y axis
+x_alignment = abs(dot(Y_cam, [1,0,0]));
+y_alignment = abs(dot(Y_cam, [0,1,0]));
+
+% If the line is more aligned with camera Y than X, we need to swap
+if y_alignment > x_alignment
+    fprintf('   - WARNING: Detected line is more aligned with camera Y than X\n');
+    fprintf('   - Forcing Y-axis to be along camera X direction\n');
+    % Project camera X-axis onto the plane perpendicular to Z_cam
+    Y_cam = [1, 0, 0];
+    Y_cam = normalize(Y_cam - dot(Y_cam, Z_cam) * Z_cam, 'norm');
+end
+
+% Ensure a consistent direction for the Y-axis (positive X in camera frame)
+if Y_cam(1) < 0
     Y_cam = -Y_cam;
 end
 
+fprintf('   - Final Y-axis direction: [%.3f, %.3f, %.3f]\n', Y_cam);
 fprintf('   - Edge line found with direction vector (Y-axis): [%.3f, %.3f, %.3f]\n', Y_cam);
 
 if showPlots
@@ -176,35 +215,19 @@ R_cam_to_world = R_cam_to_world';      % The transpose rotates camera axes TO wo
 
 fprintf('   - Table height from ground: %.2f m\n', tableHeight);
 
-% Calculate the X-offset for the world origin (changed from Y-offset)
-if ischar(worldOriginYOffset) && strcmpi(worldOriginYOffset, 'auto')
-    % Automatically determine table length and place origin at the middle
-    % Project all table points onto the XY plane of our new coordinate system
-    tablePoints_projected = (R_cam_to_world * (tablePoints3D_cam - planeOrigin_cam)')';
-    
-    % Find the extent of the table in the X direction
-    minX = min(tablePoints_projected(:, 1));
-    maxX = max(tablePoints_projected(:, 1));
-    detectedTableLength = maxX - minX;
-    
-    % Simply negate the X-offset to move into the table instead of away from it
-    xOffset = -detectedTableLength / 2;
-    fprintf('   - Auto-detected table length: %.3f m\n', detectedTableLength);
-    fprintf('   - Setting X-offset to table middle: %.3f m\n', xOffset);
-elseif isnumeric(worldOriginYOffset)
-    % Use the user-specified offset (now for X)
-    xOffset = -worldOriginYOffset;  % Negate to move into the table
-    fprintf('   - Using user-specified X-offset: %.3f m\n', xOffset);
-else
-    % Default to edge (no offset)
-    xOffset = 0;
-    fprintf('   - Using default X-offset (table edge): %.3f m\n', xOffset);
-end
+% Calculate the world origin to place it directly below the camera
+% This ensures the camera is centered above the world frame
+fprintf('   - Setting world origin to be directly below the camera\n');
 
-% Apply the X-offset to create the world origin
-% The origin is at the center of the table (X=offset, Y=0) but at ground level (Z=0)
-% Table is at Z=tableHeight in world frame
-P_cam_origin = mean(edgeInlierPoints, 1);
+% Project the camera position (origin in camera frame) onto the table plane
+% Camera position in camera frame is [0,0,0]
+camera_proj = planeOrigin_cam - dot(planeOrigin_cam, Z_cam) * Z_cam;
+
+% Use this as our reference point for the world origin
+P_cam_origin = camera_proj;
+
+% No X offset needed since we're placing origin below camera
+xOffset = 0;
 P_world_origin = [xOffset, 0, tableHeight]; % Origin at ground level (Z=0)
 
 % The transformation equation is: P_world = R * P_cam + T

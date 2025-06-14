@@ -27,8 +27,8 @@ public:
 
         bool gripper = false;
         // If in the D-H table is given also the transformation T6_ee, it has to be considered by kinematics
-        if ( D.getNumberOfElements() > 7 )
-            gripper = true;
+        // if ( D.getNumberOfElements() > 7 )
+        //     gripper = true;
 
         TypedArray<double> Te    = f.createArray<double>( {4,4}, {Re[0][0], Re[1][0], Re[2][0], 0,
                                                                   Re[0][1], Re[1][1], Re[2][1], 0,
@@ -185,6 +185,31 @@ public:
         double th2_3 = phi_13 - phi_23;
         double th2_4 = phi_14 - phi_24;
 
+        // Convert th2 angles to [-pi, pi] range
+        // while(th2_1 > pi) th2_1 -= 2*pi;
+        // while(th2_1 < -pi) th2_1 += 2*pi;
+
+        // while(th2_2 > pi) th2_2 -= 2*pi;
+        // while(th2_2 < -pi) th2_2 += 2*pi;
+
+        // while(th2_3 > pi) th2_3 -= 2*pi;
+        // while(th2_3 < -pi) th2_3 += 2*pi;
+
+        // while(th2_4 > pi) th2_4 -= 2*pi;
+        // while(th2_4 < -pi) th2_4 += 2*pi;
+
+        // while(th2_5 > pi) th2_5 -= 2*pi;
+        // while(th2_5 < -pi) th2_5 += 2*pi;
+
+        // while(th2_6 > pi) th2_6 -= 2*pi;
+        // while(th2_6 < -pi) th2_6 += 2*pi;
+
+        // while(th2_7 > pi) th2_7 -= 2*pi;
+        // while(th2_7 < -pi) th2_7 += 2*pi;
+
+        // while(th2_8 > pi) th2_8 -= 2*pi;
+        // while(th2_8 < -pi) th2_8 += 2*pi;
+
         double phi_15    = atan2( -p41_1[2], -p41_1[0] );
         double sin_phi25 = (-A[3]*sin(th3_5)) / p41xz_1;
         double phi_25    = atan2( sin_phi25, sqrt(1 - sin_phi25*sin_phi25) );
@@ -243,6 +268,19 @@ public:
                                                                    th5_1, th5_2, th5_3, th5_4, th5_1, th5_2, th5_3, th5_4,
                                                                    th6_1, th6_2, th6_3, th6_4, th6_1, th6_2, th6_3, th6_4
                                                                    } );
+        
+        // Normalize all angles to [-pi, pi]
+        for (int i = 0; i < 8; i++) {
+            for (int j = 0; j < 6; j++) {
+                while (TH[i][j] > pi) {
+                    TH[i][j] = TH[i][j] - 2*pi;
+                }
+                while (TH[i][j] < -pi) {
+                    TH[i][j] = TH[i][j] + 2*pi; 
+                }
+            }
+        }             
+                                                                  
         outputs[0] = TH;
     }
 

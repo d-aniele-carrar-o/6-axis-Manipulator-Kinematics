@@ -24,13 +24,15 @@ tableParams.length = tableLength;
 axs = create_environment( tablePosition, tableParams );
 
 % --- File Paths ---
-scenePcdPath = '/Users/danielecarraro/Documents/GITHUB/6-axis-Manipulator-Kinematics/pointclouds/pointcloud_25-06-07-11-21-29.ply';
-objectPcdPath = '/Users/danielecarraro/Documents/GITHUB/6-axis-Manipulator-Kinematics/pointclouds/segmented_objects/pointcloud_25-06-07-11-21-29/object_00.ply';
+% scenePcdPath = '/Users/danielecarraro/Documents/GITHUB/6-axis-Manipulator-Kinematics/pointclouds/pointcloud_25-06-07-11-21-29.ply';
+% objectPcdPath = '/Users/danielecarraro/Documents/GITHUB/6-axis-Manipulator-Kinematics/pointclouds/segmented_objects/pointcloud_25-06-07-11-21-29/object_00.ply';
+scenePcdPath = '/Users/danielecarraro/Documents/VSCODE/master-thesis/YOTO/output/pointcloud/pointcloud_25-06-12-18-11-36.ply';
+objectPcdPath = '/Users/danielecarraro/Documents/VSCODE/master-thesis/YOTO/output/segmented_objects/25-06-12-18-11-36/object_07.ply';
 % scenePcdPath = '/Volumes/Shared_part/realsense_data/pointcloud/pointcloud_25-06-12-12-05-30.ply';
 % objectPcdPath = '/Volumes/Shared_part/realsense_data/segmented_objects/25-06-12-12-05-30/object_02.ply';
 
 % Calibrate camera and transform object point cloud
-[tform_cam_to_world, ptCloudObject_world, ptCloudRemaining_world] = calibrate_camera( scenePcdPath, objectPcdPath, tableParams, false );
+[tform_cam_to_world, ptCloudObject_world, ptCloudRemaining_world] = calibrate_camera( scenePcdPath, objectPcdPath, tableParams, true );
 
 % Display camera transformation
 disp('Camera-to-world transformation:');
@@ -57,6 +59,12 @@ disp(object_centroid);
 % Find grasp points on the object
 [grasp_points, grasp_orientations] = find_object_grasp_points(ptCloudObject_world);
 
+%%
+% Grasp points got from real robots for the box moving task:
+% - left:  [0.05595, -0.38201, -0.00933][x,y,z], [76.24, -31.87, 105.41, -73.01, 82.20, 8.99]
+% - right: [0.00680, -0.43632, -0.00822][x,y,z], [-64.75, -152.59, -88.65, -118.93, -57.61, 311.00]
+%%
+
 % Display grasp points
 disp('Grasp points:');
 disp(grasp_points);
@@ -76,8 +84,10 @@ quiver3(grasp_points(2,1), grasp_points(2,2), grasp_points(2,3), ...
        0.05, 'g', 'LineWidth', 2, 'Parent', axs);
 
 % Initial joint configurations --------------------------------------------------------------------
-q0_left  = [ pi/2,   -pi/3,  2*pi/3,   -pi/3,  pi/2, 0]
-q0_right = [-pi/2, -2*pi/3, -2*pi/3, -2*pi/3, -pi/2, 0]
+% q0_left  = [ pi/2,   -pi/3,  2*pi/3,   -pi/3,  pi/2, 0]
+% q0_right = [-pi/2, -2*pi/3, -2*pi/3, -2*pi/3, -pi/2, 0]
+q0_left  = deg2rad([76.24, -31.87, 105.41, -73.01, 82.20, 8.99])
+q0_right = deg2rad([-64.75, -152.59, -88.65, -118.93, -57.61, 311.00])
 
 % Set robot configurations
 config_left  = set_robot_configuration( q0_left,  config_left );
