@@ -70,7 +70,7 @@ object_centroid = mean(ptCloudObject_world.Location);
 disp('Object centroid position in world frame:');
 disp(object_centroid);
 
-% Find grasp points on the object
+% Find grasp points on the objec
 [grasp_points, grasp_orientations] = find_object_grasp_points(ptCloudObject_world);
 
 %%
@@ -98,10 +98,10 @@ quiver3(grasp_points(2,1), grasp_points(2,2), grasp_points(2,3), ...
        0.05, 'g', 'LineWidth', 2, 'Parent', axs);
 
 % Initial joint configurations --------------------------------------------------------------------
-% q0_left  = [ pi/2,   -pi/3,  2*pi/3,   -pi/3,  pi/2, 0]
-% q0_right = [-pi/2, -2*pi/3, -2*pi/3, -2*pi/3, -pi/2, 0]
-q0_left  = deg2rad([76.24, -31.87, 105.41, -73.01, 82.20, 8.99])
-q0_right = deg2rad([-64.75, -152.59, -88.65, -118.93, -57.61, 311.00])
+q0_left  = [ pi/2,   -pi/3,  2*pi/3,   -pi/3,  pi/2, 0];
+q0_right = [-pi/2, -2*pi/3, -2*pi/3, -2*pi/3, -pi/2, 0];
+% q0_left  = deg2rad([76.24, -31.87, 105.41, -73.01, 82.20, 8.99]);
+% q0_right = deg2rad([-64.75, -152.59, -88.65, -118.93, -57.61, 311.00]);
 
 % Set robot configurations
 config_left  = set_robot_configuration( q0_left,  config_left );
@@ -156,7 +156,7 @@ disp('Planning trajectories for both robots...');
 %     - X +
 
 % Create viapoints for both robots in world reference frame
-ti   = 0
+ti   = 0;
 
 % First viapoint: set first desired configuration/pose (viapoint) using grasp points
 % Create transformation matrices for grasp points
@@ -167,39 +167,35 @@ pf_l = grasp_points(1,:)';
 % Negative offset to approach from outside the object
 approach_offset = 0.05; % 5cm offset for approach
 pf_l = pf_l - approach_offset * R_grasp_l(:,3);
-T_w_o_l = [R_grasp_l, pf_l; 0,0,0,1]
-Tf_l = inv(Trf_0_l) * T_w_o_l
+T_w_o_l = [R_grasp_l, pf_l; 0,0,0,1];
+Tf_l = Trf_0_l \ T_w_o_l;
 
 R_grasp_r = squeeze(grasp_orientations(2,:,:));
 pf_r = grasp_points(2,:)';
 % Add a small offset in the approach direction
 pf_r = pf_r - approach_offset * R_grasp_r(:,3);
-T_w_o_r = [R_grasp_r, pf_r; 0,0,0,1]
-Tf_r = inv(Trf_0_r) * T_w_o_r
+T_w_o_r = [R_grasp_r, pf_r; 0,0,0,1];
+Tf_r = Trf_0_r \ T_w_o_r;
 
-t1   = 1
+t1   = 1;
 
 % Second viapoint: move to actual grasp positions (no offset)
 pf2_l = grasp_points(1,:)';
-T2_w_o_l = [R_grasp_l, pf2_l; 0,0,0,1]
-Tf2_l = inv(Trf_0_l) * T2_w_o_l
+T2_w_o_l = [R_grasp_l, pf2_l; 0,0,0,1];
+Tf2_l = Trf_0_l \ T2_w_o_l;
 
 pf2_r = grasp_points(2,:)';
-T2_w_o_r = [R_grasp_r, pf2_r; 0,0,0,1]
-Tf2_r = inv(Trf_0_r) * T2_w_o_r
-
-t2   = 2
+T2_w_o_r = [R_grasp_r, pf2_r; 0,0,0,1];
+Tf2_r = Trf_0_r \ T2_w_o_r;
 
 % Third viapoint: lift object together
 pf3_l = grasp_points(1,:)' + [0; 0; 0.2]; % Lift 20cm up
-T3_w_o_l = [R_grasp_l, pf3_l; 0,0,0,1]
-Tf3_l = inv(Trf_0_l) * T3_w_o_l
+T3_w_o_l = [R_grasp_l, pf3_l; 0,0,0,1];
+Tf3_l = Trf_0_l \ T3_w_o_l;
 
 pf3_r = grasp_points(2,:)' + [0; 0; 0.2]; % Lift 20cm up
-T3_w_o_r = [R_grasp_r, pf3_r; 0,0,0,1]
-Tf3_r = inv(Trf_0_r) * T3_w_o_r
-
-t3   = 3
+T3_w_o_r = [R_grasp_r, pf3_r; 0,0,0,1];
+Tf3_r = Trf_0_r \ T3_w_o_r;
 
 viapoints_l = [Tf_l];
 viapoints_r = [Tf_r];
@@ -211,17 +207,30 @@ times       = [ti, t1];
 [t_l_appr, p_l_appr, v_l_appr] = multipoint_trajectory( q0_left,  viapoints_l, times );
 [t_r_appr, p_r_appr, v_r_appr] = multipoint_trajectory( q0_right, viapoints_r, times );
 
-viapoints_l = [Tf2_l; Tf3_l];
-viapoints_r = [Tf2_r; Tf3_r];
-times       = [t1, t2, t3];
+viapoints_l = [Tf2_l];
+viapoints_r = [Tf2_r];
+t1          = max(t_l_appr(end), t_r_appr(end));
+t2          = t1 + 1;
+times       = [t1, t2];
 
-% Second: compute trajectory for the following pieces of the task, as the two manipulators will now 
-%         be now synchronous
-[t_l, p_l, v_l] = multipoint_trajectory( p_l_appr(end,:),  viapoints_l, times );
-[t_r, p_r, v_r] = multipoint_trajectory( p_r_appr(end,:), viapoints_r, times );
+% Second: compute trajectory for the following pieces of the task
+[t_l2, p_l2, v_l2] = multipoint_trajectory( p_l_appr(end,:), viapoints_l, times );
+[t_r2, p_r2, v_r2] = multipoint_trajectory( p_r_appr(end,:), viapoints_r, times );
+
+viapoints_l = [Tf3_l];
+viapoints_r = [Tf3_r];
+t2          = max(t_l2(end), t_r2(end));
+t3          = t2 + 1;
+times       = [t2, t3];
+
+% Third: compute trajectory for the following pieces of the task
+[t_l3, p_l3, v_l3] = multipoint_trajectory( p_l2(end,:), viapoints_l, times );
+[t_r3, p_r3, v_r3] = multipoint_trajectory( p_r2(end,:), viapoints_r, times );
 
 % Run the simulation ------------------------------------------------------------------------------
 [qf, axs] = simulate_dual({robot_left, robot_right}, {config_left, config_right}, ...
                           {Trf_0_l, Trf_0_r}, {p_l_appr, p_r_appr}, axs);
 [qf, axs] = simulate_dual({robot_left, robot_right}, {config_left, config_right}, ...
-                          {Trf_0_l, Trf_0_r}, {p_l, p_r}, axs);
+                          {Trf_0_l, Trf_0_r}, {p_l2, p_r2}, axs);
+[qf, axs] = simulate_dual({robot_left, robot_right}, {config_left, config_right}, ...
+                          {Trf_0_l, Trf_0_r}, {p_l3, p_r3}, axs);

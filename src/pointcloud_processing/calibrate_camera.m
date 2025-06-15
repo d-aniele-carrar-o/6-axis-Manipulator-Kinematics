@@ -131,37 +131,126 @@ fprintf('   - Plane found with normal vector: [%.3f, %.3f, %.3f]\n', planeModel.
 Z_cam = normalize(planeModel.Normal, 'norm');
 fprintf('   - Using camera Z-axis: [%.3f, %.3f, %.3f]\n', Z_cam);
 
+% Project table points onto the fitted plane to work in 2D
+tablePoints3D_cam = ptCloudTable_cam.Location;
+planeOrigin_cam = -planeModel.Normal * planeModel.Parameters(4);  % A point on the plane
+vecsToPoints = tablePoints3D_cam - planeOrigin_cam;
+dists = vecsToPoints * Z_cam';
+projectedTablePoints3D_cam = tablePoints3D_cam - dists .* Z_cam;
+
+% Visualize plane fitting results
+if showPlots
+    figure('Name', 'Plane Fitting Visualization');
+    
+    % Plot original scene points
+    pcshow(ptCloudScene.Location, [0.7 0.7 0.7], 'MarkerSize', 15);
+    hold on;
+    
+    % Create a grid of points on the fitted plane
+    [gridX, gridY] = meshgrid(min(ptCloudScene.Location(:,1)):0.05:max(ptCloudScene.Location(:,1)), ...
+                             min(ptCloudScene.Location(:,2)):0.05:max(ptCloudScene.Location(:,2)));
+    gridZ = (-planeModel.Parameters(1)*gridX - planeModel.Parameters(2)*gridY - planeModel.Parameters(4)) / planeModel.Parameters(3);
+    
+    % Plot the fitted plane surface
+    surf(gridX, gridY, gridZ, 'FaceColor', 'g', 'FaceAlpha', 0.3, 'EdgeColor', 'none');
+    
+    % Draw Z_cam direction arrow from plane center
+    planeCenterPoint = planeOrigin_cam;
+    arrowLength = 0.3; % Length of the arrow in meters
+    quiver3(planeCenterPoint(1), planeCenterPoint(2), planeCenterPoint(3), ...
+            Z_cam(1)*arrowLength, Z_cam(2)*arrowLength, Z_cam(3)*arrowLength, ...
+            'r', 'LineWidth', 3, 'MaxHeadSize', 0.5);
+    
+    title('Plane Fitting Results with Surface Normal');
+    xlabel('X (m)'); ylabel('Y (m)'); zlabel('Z (m)');
+    legend('Scene Points', 'Fitted Plane', 'Surface Normal (Z_{cam})', 'Location', 'best');
+    axis equal; grid on;
+    view(30, 25);
+    hold off;
+end
+
 %% =======================================================================
 %  DETECT TABLE EDGES VIA ROBUST LINE FITTING
 %  =======================================================================
 fprintf('Detecting table edges using RANSAC...\n');
 
-% Project table points onto the fitted plane to work in 2D
-tablePoints3D_cam = ptCloudTable_cam.Location;
-planeOrigin_cam = -planeModel.Normal * planeModel.Parameters(4); % A point on the plane
-vecsToPoints = tablePoints3D_cam - planeOrigin_cam;
-dists = vecsToPoints * Z_cam';
-projectedTablePoints3D_cam = tablePoints3D_cam - dists .* Z_cam;
+% Define border region width (in meters)
+borderWidth = 0.05; % 5cm border region along the edges
 
-% Find the boundary points of the projected 2D point cloud segment
-% 'boundary' is better than 'convhull' for partial views.
-% We use a shrink factor to get a tight boundary.
+% Find the extents of the projected table points
+minX = min(projectedTablePoints3D_cam(:,1));
+maxX = max(projectedTablePoints3D_cam(:,1));
+minY = min(projectedTablePoints3D_cam(:,2));
+maxY = max(projectedTablePoints3D_cam(:,2));
+
+% Filter points to keep only those in the border region
+borderPoints = projectedTablePoints3D_cam(  (projectedTablePoints3D_cam(:,1) < minX + borderWidth) | ...
+                                            (projectedTablePoints3D_cam(:,1) > maxX - borderWidth) | ...
+                                            (projectedTablePoints3D_cam(:,2) < minY + borderWidth) | ...
+                                            (projectedTablePoints3D_cam(:,2) > maxY - borderWidth), :);
+
+fprintf('   - Using %d border points (%.1f%% of total) for edge detection\n', ...
+    size(borderPoints,1), 100*size(borderPoints,1)/size(projectedTablePoints3D_cam,1));
+
 % Convert to double and remove any NaN values
-validPoints = projectedTablePoints3D_cam;
+validPoints = borderPoints;
 validPoints = double(validPoints);
 validIdx = ~any(isnan(validPoints), 2);
 validPoints = validPoints(validIdx, :);
 
 % Now call boundary with clean data
-k = boundary(validPoints(:,1), validPoints(:,2), 0.9);
+k = boundary(validPoints(:,1), validPoints(:,2), 0.8); % Using a tighter shrink factor for border points
 boundaryPoints3D = validPoints(k,:);
 
+% Additional filtering to remove potential outliers
+% Calculate distances between consecutive boundary points
+nPoints = size(boundaryPoints3D, 1);
+distances = zeros(nPoints, 1);
+for i = 1:nPoints
+    next_idx = mod(i, nPoints) + 1;
+    distances(i) = norm(boundaryPoints3D(i,:) - boundaryPoints3D(next_idx,:));
+end
+
+% Identify and remove outliers (points with unusually large gaps)
+meanDist = mean(distances);
+stdDist = std(distances);
+outlierThreshold = meanDist + 2*stdDist;
+outlierIndices = find(distances > outlierThreshold);
+
+% If outliers are found, refine the boundary
+if ~isempty(outlierIndices)
+    fprintf('   - Removing %d outlier boundary points\n', length(outlierIndices));
+    % Remove the outliers and their neighbors
+    removeIndices = unique([outlierIndices; mod(outlierIndices, nPoints) + 1]);
+    keepIndices = setdiff(1:nPoints, removeIndices);
+    boundaryPoints3D = boundaryPoints3D(keepIndices, :);
+end
+
 if showPlots
-    figure;
-    pcshow(ptCloudTable_cam);
+    figure('Name', 'Edge Fitting Visualization');
+
+    % Create point cloud objects with colors
+    pcshow(ptCloudTable_cam.Location, [0.7 0.7 0.7], 'MarkerSize', 15);
     hold on;
-    plot3(boundaryPoints3D(:,1), boundaryPoints3D(:,2), boundaryPoints3D(:,3), 'r.');
-    title('Table Points with Detected Boundary Points (Red)');
+    
+    % Visualize the border region used for edge detection
+    if ~isempty(borderPoints)
+        scatter3(borderPoints(:,1), borderPoints(:,2), borderPoints(:,3), 20, "green")
+    end
+    
+    % Visualize the final boundary points
+    plot3(boundaryPoints3D(:,1), boundaryPoints3D(:,2), boundaryPoints3D(:,3), 'r.', 'MarkerSize', 20);
+    
+    % Connect boundary points to show the detected perimeter
+    for i = 1:size(boundaryPoints3D, 1)
+        next_idx = mod(i, size(boundaryPoints3D, 1)) + 1;
+        plot3([boundaryPoints3D(i,1), boundaryPoints3D(next_idx,1)], ...
+              [boundaryPoints3D(i,2), boundaryPoints3D(next_idx,2)], ...
+              [boundaryPoints3D(i,3), boundaryPoints3D(next_idx,3)], 'r-', 'LineWidth', 1);
+    end
+    
+    title('Table Points with Border Region (Green) and Boundary Points (Red)');
+    legend('Table Points', 'Border Region', 'Boundary Points', 'Location', 'best');
     hold off;
 end
 
@@ -231,17 +320,18 @@ if X_cam(2) < 0  % Check Y component since camera Y aligns with world X
 end
 
 if showPlots
-    figure;
-    pcshow(boundaryPoints3D, 'MarkerSize', 30);
+    figure('Name', 'Line Fitting Results');
+    % Create point cloud objects with colors
+    pcshow(boundaryPoints3D, [0.7 0.7 0.7], 'MarkerSize', 30);
     hold on;
     
     % Plot the first edge (Y-axis)
-    pcshow(edgeInlierPoints1, 'r', 'MarkerSize', 50);
+    pcshow(edgeInlierPoints1, [0 1 0], 'MarkerSize', 50);
     linePts1 = [mean(edgeInlierPoints1) - Y_cam*0.5; mean(edgeInlierPoints1) + Y_cam*0.5];
     plot3(linePts1(:,1), linePts1(:,2), linePts1(:,3), 'g-', 'LineWidth', 3);
     
     % Plot the second edge (X-axis)
-    pcshow(edgeInlierPoints2, 'b', 'MarkerSize', 50);
+    pcshow(edgeInlierPoints2, [1 0 0], 'MarkerSize', 50);
     linePts2 = [mean(edgeInlierPoints2) - X_cam*0.5; mean(edgeInlierPoints2) + X_cam*0.5];
     plot3(linePts2(:,1), linePts2(:,2), linePts2(:,3), 'r-', 'LineWidth', 3);
     

@@ -82,6 +82,11 @@ function [qf, axs] = simulate_dual(robots, configs, transforms, trajectories, ax
         end
         
         waitfor(rate);
+
+        % Break if figure is closed
+        if ~ishandle(axs.Parent)
+            break;
+        end
     end
 
     qf = {p_l(end,:), p_r(end,:)};

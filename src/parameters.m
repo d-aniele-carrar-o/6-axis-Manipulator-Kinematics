@@ -116,7 +116,7 @@ function parameters( level, robot_id )
     tableWidth     = 1.5;
     tableLength    = 0.7;
     tablePosition  = [0.0, 0.0, tableHeight];
-    tableRoI       = [1.0, 0.7, 0.5];  % RoI for plane fitting in camera coords
+    tableRoI       = [1.0, 0.8, 0.5];  % RoI for plane fitting in camera coords
     standHeight    = 0.215;
     robotsDistance = 1.365;  % Distance between robot's base origins
 
