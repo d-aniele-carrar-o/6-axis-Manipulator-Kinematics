@@ -110,12 +110,13 @@ function parameters( level, robot_id )
         exit
     
     end
-
+% okay, this is workingexclude X (camera) directns fitting for line fit
     % Set table dimensions
     tableHeight    = 0.6;
     tableWidth     = 1.5;
     tableLength    = 0.7;
     tablePosition  = [0.0, 0.0, tableHeight];
+    tableRoI       = [1.0, 0.7, 0.5];  % RoI for plane fitting in camera coords
     standHeight    = 0.215;
     robotsDistance = 1.365;  % Distance between robot's base origins
 

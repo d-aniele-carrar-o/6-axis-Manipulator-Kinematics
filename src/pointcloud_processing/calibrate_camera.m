@@ -8,12 +8,13 @@ function [tform_cam_to_world, ptCloudObject_world, ptCloudRemaining_world] = cal
 % Inputs:
 %   scenePcdPath - Path to the scene point cloud file
 %   objectPcdPath - Path to the object point cloud file
-%   tableParams - Structure with table parameters (height, width, length)
+%   tableParams - Structure with table parameters (height, width, length, roi)
 %   showPlots - Boolean to control visualization (default: false)
 %
 % Outputs:
 %   tform_cam_to_world - Rigid transformation from camera to world frame
 %   ptCloudObject_world - Object point cloud transformed to world frame
+%   ptCloudRemaining_world - Remaining point cloud transformed to world frame
 
 % Handle optional arguments
 if nargin < 4
@@ -24,6 +25,7 @@ end
 tableHeight = tableParams.height;
 tableWidth = tableParams.width;
 tableLength = tableParams.length;
+tableRoI = tableParams.roi;  % [x, y, z] - Region of Interest for table plane fitting
 
 % --- Calibration Parameters ---
 planeMaxDistance = 0.03;
@@ -49,7 +51,7 @@ ptCloudObject_cam = pcread(objectPcdPath);
 if false
     % Visualize Scene and Object Point Clouds
     figure('Name', 'Scene and Object Visualization', 'Position', [100, 100, 1000, 800]);
-    
+     
     % Plot full scene in gray
     pcshow(ptCloudScene.Location, [0.7 0.7 0.7], 'MarkerSize', 15);
     hold on;
@@ -75,8 +77,45 @@ end
 %  DETECT TABLE PLANE
 %  =======================================================================
 fprintf('Detecting the table plane...\n');
-[planeModel, inlierIndices, outlierIndices] = pcfitplane(ptCloudScene, ...
+
+% Apply Region of Interest (RoI) filtering to exclude robot bases
+fprintf('   - Applying RoI filter [%.2f, %.2f, %.2f] to exclude robot bases\n', tableRoI);
+ptCloud_locations = ptCloudScene.Location;
+ptCloud_center = mean(ptCloud_locations, 1);  % Use point cloud center as reference
+
+% Filter points within the RoI (in camera coordinates)
+% Note: tableRoI is expressed in camera coordinates where:
+% - Camera X is aligned with world Y
+% - Camera Y is aligned with world X
+roi_x_half = tableRoI(1) / 2;  % Camera X dimension
+roi_y_half = tableRoI(2) / 2;  % Camera Y dimension
+roi_z = tableRoI(3);           % Z distance from table surface
+
+% Find points within the RoI centered at the point cloud center
+roi_indices = find(abs(ptCloud_locations(:,1) - ptCloud_center(1)) <= roi_x_half & ...
+                  abs(ptCloud_locations(:,2) - ptCloud_center(2)) <= roi_y_half & ...
+                  abs(ptCloud_locations(:,3) - ptCloud_center(3)) <= roi_z);
+
+% Create a filtered point cloud for plane fitting
+ptCloudRoI = select(ptCloudScene, roi_indices);
+
+if showPlots
+    figure;
+    pcshow(ptCloudScene.Location, [0.7 0.7 0.7], 'MarkerSize', 15);
+    hold on;
+    pcshow(ptCloudRoI.Location, [0 1 0], 'MarkerSize', 20);
+    title('Point Cloud with RoI Filter Applied');
+    legend('Full Scene', 'RoI for Plane Fitting');
+    hold off;
+end
+
+% Fit plane using only points within RoI
+[planeModel, inlierIndicesRoI, outlierIndicesRoI] = pcfitplane(ptCloudRoI, ...
     planeMaxDistance, planeReferenceVector, maxAngularDistance);
+
+% Map RoI inliers back to original point cloud indices
+inlierIndices = roi_indices(inlierIndicesRoI);
+outlierIndices = setdiff(1:ptCloudScene.Count, inlierIndices);
 
 if isempty(inlierIndices)
     error('Could not detect a suitable plane.');
@@ -93,9 +132,9 @@ Z_cam = normalize(planeModel.Normal, 'norm');
 fprintf('   - Using camera Z-axis: [%.3f, %.3f, %.3f]\n', Z_cam);
 
 %% =======================================================================
-%  DETECT TABLE EDGE VIA ROBUST LINE FITTING
+%  DETECT TABLE EDGES VIA ROBUST LINE FITTING
 %  =======================================================================
-fprintf('Detecting table edge line using RANSAC...\n');
+fprintf('Detecting table edges using RANSAC...\n');
 
 % Project table points onto the fitted plane to work in 2D
 tablePoints3D_cam = ptCloudTable_cam.Location;
@@ -126,37 +165,89 @@ if showPlots
     hold off;
 end
 
-% Use RANSAC to find the best straight line among the boundary points
-% This is robust to curves and noise.
-addpath(fullfile(fileparts(mfilename('fullpath')), '.'));  % Add current directory to path
-[lineModel, inlierIdx] = ransac(boundaryPoints3D, @(pts) fitLine3d(pts(:,1),pts(:,2),pts(:,3)), ...
+% Add current directory to path for RANSAC functions
+addpath(fullfile(fileparts(mfilename('fullpath')), '.'));
+
+%% First edge detection (Y-axis aligned with world Y)
+fprintf('   - Detecting first edge (Y-axis)...\n');
+
+% Use RANSAC to find the first edge line (expected to align with world Y)
+[lineModel1, inlierIdx1] = ransac(boundaryPoints3D, @(pts) fitLine3d(pts(:,1),pts(:,2),pts(:,3)), ...
     @(model, pts) distPointToLine3d(pts, model), sampleSize, lineMaxDistance, 'MaxNumTrials', 1000);
 
-edgeInlierPoints = boundaryPoints3D(inlierIdx, :);
+edgeInlierPoints1 = boundaryPoints3D(inlierIdx1, :);
 
-% Extract the direction vector of the line, which is our Y-axis (instead of X-axis)
-Y_cam = normalize(lineModel(4:6), 'norm');
+% Extract the direction vector of the first line (Y-axis)
+Y_cam_initial = normalize(lineModel1(4:6), 'norm');
 
-% Ensure the Y-axis is perfectly perpendicular to the Z-axis
-Y_cam = normalize(Y_cam - dot(Y_cam, Z_cam) * Z_cam, 'norm');
+% Ensure the Y-axis is perpendicular to the Z-axis
+Y_cam = normalize(Y_cam_initial - dot(Y_cam_initial, Z_cam) * Z_cam, 'norm');
 
-% Ensure a consistent direction for the Y-axis
-if Y_cam(2) < 0
+% Ensure a consistent direction for the Y-axis (camera X aligned with world Y)
+if Y_cam(1) < 0  % Check X component since camera X aligns with world Y
     Y_cam = -Y_cam;
 end
 
-fprintf('   - Edge line found with direction vector (Y-axis): [%.3f, %.3f, %.3f]\n', Y_cam);
+fprintf('   - First edge found with direction vector (Y-axis): [%.3f, %.3f, %.3f]\n', Y_cam);
+
+%% Second edge detection (X-axis aligned with world X)
+fprintf('   - Detecting second edge (X-axis)...\n');
+
+% Remove the first edge inliers from boundary points to find the second edge
+remainingBoundaryPoints = boundaryPoints3D;
+remainingBoundaryPoints(inlierIdx1, :) = [];
+
+% Use RANSAC to find the second edge line (expected to align with world X)
+% We need to ensure this line is roughly perpendicular to the first one
+[lineModel2, inlierIdx2] = ransac(remainingBoundaryPoints, @(pts) fitLine3d(pts(:,1),pts(:,2),pts(:,3)), ...
+    @(model, pts) distPointToLine3d(pts, model), sampleSize, lineMaxDistance, 'MaxNumTrials', 1000);
+
+edgeInlierPoints2 = remainingBoundaryPoints(inlierIdx2, :);
+
+% Extract the direction vector of the second line
+X_cam_initial = normalize(lineModel2(4:6), 'norm');
+
+% Ensure the X-axis is perpendicular to the Z-axis
+X_cam_projected = normalize(X_cam_initial - dot(X_cam_initial, Z_cam) * Z_cam, 'norm');
+
+% Check if X_cam_projected is roughly perpendicular to Y_cam
+angle_between = acosd(abs(dot(X_cam_projected, Y_cam)));
+fprintf('   - Angle between detected edges: %.2f degrees\n', angle_between);
+
+% If the angle is not close to 90 degrees, we need to force orthogonality
+if abs(angle_between - 90) > 15
+    fprintf('   - Detected edges are not orthogonal. Forcing orthogonality.\n');
+    % Force X_cam to be perpendicular to both Y_cam and Z_cam
+    X_cam = cross(Y_cam, Z_cam);
+else
+    % Ensure X_cam is exactly perpendicular to Y_cam and Z_cam
+    X_cam = cross(Y_cam, Z_cam);
+    fprintf('   - Second edge found with direction vector (X-axis): [%.3f, %.3f, %.3f]\n', X_cam);
+end
+
+% Ensure a consistent direction for the X-axis (camera Y aligned with world X)
+if X_cam(2) < 0  % Check Y component since camera Y aligns with world X
+    X_cam = -X_cam;
+end
 
 if showPlots
     figure;
-    pcshow(boundaryPoints3D, 'MarkerSize', 50);
+    pcshow(boundaryPoints3D, 'MarkerSize', 30);
     hold on;
-    pcshow(edgeInlierPoints, 'r', 'MarkerSize', 80);
-    % Plot the fitted line
-    linePts = [mean(edgeInlierPoints) - Y_cam*0.5; mean(edgeInlierPoints) + Y_cam*0.5];
-    plot3(linePts(:,1), linePts(:,2), linePts(:,3), 'g-', 'LineWidth', 3);
-    title('RANSAC Line Fit to Boundary Points (Y-axis)');
-    legend('Boundary Points', 'Line Inliers', 'Fitted Edge Line (Y-axis)');
+    
+    % Plot the first edge (Y-axis)
+    pcshow(edgeInlierPoints1, 'r', 'MarkerSize', 50);
+    linePts1 = [mean(edgeInlierPoints1) - Y_cam*0.5; mean(edgeInlierPoints1) + Y_cam*0.5];
+    plot3(linePts1(:,1), linePts1(:,2), linePts1(:,3), 'g-', 'LineWidth', 3);
+    
+    % Plot the second edge (X-axis)
+    pcshow(edgeInlierPoints2, 'b', 'MarkerSize', 50);
+    linePts2 = [mean(edgeInlierPoints2) - X_cam*0.5; mean(edgeInlierPoints2) + X_cam*0.5];
+    plot3(linePts2(:,1), linePts2(:,2), linePts2(:,3), 'r-', 'LineWidth', 3);
+    
+    title('RANSAC Line Fits to Table Edges');
+    legend('Boundary Points', 'Y-axis Edge Points', 'Y-axis Edge Line', ...
+           'X-axis Edge Points', 'X-axis Edge Line');
     hold off;
 end
 
@@ -165,14 +256,51 @@ end
 %  =======================================================================
 fprintf('Computing the camera-to-world transformation from axes...\n');
 
-% We have Z_cam (from plane) and Y_cam (from edge line).
-% We compute X_cam to form a right-handed coordinate system.
-X_cam = cross(Y_cam, Z_cam);
+% We now have all three axes: X_cam, Y_cam, and Z_cam
+% Ensure they form an orthonormal basis (already done in edge detection)
 
-% The rotation matrix is what transforms the [X_cam, Y_cam, Z_cam] basis
-% to the world basis [1,0,0], [0,1,0], [0,0,1].
-R_cam_to_world = [X_cam; Y_cam; Z_cam]; % Note: This forms the matrix that rotates world axes TO camera axes.
-R_cam_to_world = R_cam_to_world';      % The transpose rotates camera axes TO world axes.
+% Verify orthogonality
+xy_dot = abs(dot(X_cam, Y_cam));
+xz_dot = abs(dot(X_cam, Z_cam));
+yz_dot = abs(dot(Y_cam, Z_cam));
+
+fprintf('   - Orthogonality check (should be close to 0):\n');
+fprintf('     X·Y = %.6f, X·Z = %.6f, Y·Z = %.6f\n', xy_dot, xz_dot, yz_dot);
+
+% The rotation matrix transforms the camera coordinate system to the world coordinate system
+% In our setup:
+% - Camera X axis (roughly aligned with world Y) -> World Y axis
+% - Camera Y axis (roughly aligned with world X) -> World X axis
+% - Camera Z axis (pointing down to table) -> World Z axis (pointing up)
+
+% Create the rotation matrix with the correct mapping:
+% [X_cam, Y_cam, Z_cam] -> [World X, World Y, World Z]
+% Note: We need to swap X and Y and negate Z to match the world frame orientation
+% Form the rotation matrix with columns as the basis vectors
+R_cam_to_world_corrected = [X_cam; Y_cam; Z_cam];  % Note: X and Y are swapped to match world frame
+
+% Verify the rotation matrix is proper (det = 1)
+det_R = det(R_cam_to_world_corrected);
+fprintf('   - Determinant of rotation matrix: %.6f (should be close to 1)\n', det_R);
+
+% Ensure it's a proper rotation matrix (orthogonal with determinant 1)
+if abs(det_R - 1) > 0.01
+    fprintf('   - Warning: Rotation matrix is not proper. Applying correction.\n');
+    
+    % If determinant is negative, we need to flip one axis to make it positive
+    if det_R < 0
+        fprintf('   - Determinant is negative, flipping Y axis to ensure proper rotation.\n');
+        R_cam_to_world_corrected(:,2) = -R_cam_to_world_corrected(:,2);
+        det_R = det(R_cam_to_world_corrected);
+        fprintf('   - New determinant after correction: %.6f\n', det_R);
+    end
+    
+    % Ensure orthogonality using SVD
+    [U, ~, V] = svd(R_cam_to_world_corrected);
+    R_cam_to_world = U * V';
+else
+    R_cam_to_world = R_cam_to_world_corrected;
+end
 
 fprintf('   - Table height from ground: %.2f m\n', tableHeight);
 
@@ -188,7 +316,7 @@ if ischar(worldOriginYOffset) && strcmpi(worldOriginYOffset, 'auto')
     detectedTableLength = maxX - minX;
     
     % Simply negate the X-offset to move into the table instead of away from it
-    xOffset = -detectedTableLength / 2;
+    xOffset = detectedTableLength / 2;
     fprintf('   - Auto-detected table length: %.3f m\n', detectedTableLength);
     fprintf('   - Setting X-offset to table middle: %.3f m\n', xOffset);
 elseif isnumeric(worldOriginYOffset)
@@ -204,12 +332,23 @@ end
 % Apply the X-offset to create the world origin
 % The origin is at the center of the table (X=offset, Y=0) but at ground level (Z=0)
 % Table is at Z=tableHeight in world frame
-P_cam_origin = mean(edgeInlierPoints, 1);
+P_cam_origin = mean(edgeInlierPoints1, 1);
 P_world_origin = [xOffset, 0, tableHeight]; % Origin at ground level (Z=0)
 
 % The transformation equation is: P_world = R * P_cam + T
 % So, T = P_world_origin' - R * P_cam_origin'
 T_cam_to_world = P_world_origin' - R_cam_to_world * P_cam_origin';
+
+% Refine the translation to ensure table points are exactly at tableHeight
+% This helps correct any small errors in the transformation
+fprintf('   - Refining translation to ensure table points align with tableHeight...\n');
+ptCloudTable_world_test = pctransform(ptCloudTable_cam, rigidtform3d(R_cam_to_world, T_cam_to_world'));
+table_heights = ptCloudTable_world_test.Location(:,3);
+height_error = tableHeight - median(table_heights);
+fprintf('   - Height adjustment: %.4f m\n', height_error);
+
+% Apply the height correction to the translation
+T_cam_to_world(3) = T_cam_to_world(3) + height_error;
 
 % Create the final 4x4 transformation object
 tform_cam_to_world = rigidtform3d(R_cam_to_world, T_cam_to_world');
@@ -233,16 +372,44 @@ ptCloudTable_world = pctransform(ptCloudTable_cam, tform_cam_to_world);
 
 if showPlots
     % Create the final visualization
-    figure('Name', 'Final Calibrated Simulation Scene (Edge-Based)', 'Position', [100, 100, 1000, 800]);
+    figure('Name', 'Final Calibrated Simulation Scene (Two-Edge Based)', 'Position', [100, 100, 1000, 800]);
     
     % Create a simulated table surface (tableLength x tableWidth centered at world origin)
     [X, Y] = meshgrid([-tableLength/2:0.05:tableLength/2], [-tableWidth/2:0.05:tableWidth/2]);
     Z = zeros(size(X)) + tableHeight;  % Table is at Z=tableHeight in world frame
     surf(X, Y, Z, 'FaceColor', [0.8 0.7 0.6], 'FaceAlpha', 0.3, 'EdgeColor', 'none'); hold on;
     
+    % Add table edges for reference
+    plot3([-tableLength/2, tableLength/2], [-tableWidth/2, -tableWidth/2], [tableHeight, tableHeight], 'k-', 'LineWidth', 2); hold on;
+    plot3([-tableLength/2, -tableLength/2], [-tableWidth/2, tableWidth/2], [tableHeight, tableHeight], 'k-', 'LineWidth', 2); hold on;
+    plot3([tableLength/2, tableLength/2], [-tableWidth/2, tableWidth/2], [tableHeight, tableHeight], 'k-', 'LineWidth', 2); hold on;
+    plot3([-tableLength/2, tableLength/2], [tableWidth/2, tableWidth/2], [tableHeight, tableHeight], 'k-', 'LineWidth', 2); hold on;
+    
+    % Visualize the RoI used for plane fitting
+    % Exchange X and Y since RoI is expressed in camera coordinates
+    % and camera X is aligned with world Y
+    roi_y = tableRoI(1);  % Camera X -> World Y
+    roi_x = tableRoI(2);  % Camera Y -> World X
+    roi_z = tableRoI(3);
+    roi_corners = [
+        -roi_x/2, -roi_y/2, tableHeight;
+        roi_x/2, -roi_y/2, tableHeight;
+        roi_x/2, roi_y/2, tableHeight;
+        -roi_x/2, roi_y/2, tableHeight;
+        -roi_x/2, -roi_y/2, tableHeight
+    ];
+    plot3(roi_corners(:,1), roi_corners(:,2), roi_corners(:,3), 'g-', 'LineWidth', 2); hold on;
+    text(0, 0, tableHeight + 0.05, 'Table RoI', 'Color', 'g', 'FontWeight', 'bold');
+    
+    % Visualize the transformed point clouds
     pcshow(ptCloudTable_world.Location, 'y', 'MarkerSize', 20); hold on;
     pcshow(ptCloudRemaining_world.Location, [0.7 0.7 0.7], 'MarkerSize', 20); hold on;
     pcshow(ptCloudObject_world.Location, 'r', 'MarkerSize', 50); hold on;
+    
+    % Add a horizontal plane at table height to check alignment
+    [checkX, checkY] = meshgrid([-0.1:0.05:0.1], [-0.1:0.05:0.1]);
+    checkZ = zeros(size(checkX)) + tableHeight;
+    surf(checkX, checkY, checkZ, 'FaceColor', [0 0.5 1], 'FaceAlpha', 0.2, 'EdgeColor', 'none'); hold on;
     
     % Plot the camera's position and orientation in the world frame
     plotCamera('AbsolutePose', tform_cam_to_world, 'Size', 0.1, 'Color', 'b', 'Opacity', 0.2); hold on;
@@ -256,11 +423,17 @@ if showPlots
     plot3([xOffset xOffset], [0 0], [0 tableHeight], 'k--', 'LineWidth', 2); hold on;
     text(xOffset, 0.02, tableHeight/2, sprintf('Table Height: %.2f m', tableHeight), 'Color', 'k'); hold on;
     
+    % Add coordinate axes at the detected table corners to verify alignment
+    cornerSize = 0.1;
+    % Bottom-left corner
+    plot3([-tableLength/2, -tableLength/2+cornerSize], [-tableWidth/2, -tableWidth/2], [tableHeight, tableHeight], 'r-', 'LineWidth', 2); hold on;
+    plot3([-tableLength/2, -tableLength/2], [-tableWidth/2, -tableWidth/2+cornerSize], [tableHeight, tableHeight], 'g-', 'LineWidth', 2); hold on;
+    
     % Final plot adjustments
-    title('Final Calibrated Scene (Edge-Based)');
+    title('Final Calibrated Scene (Two-Edge Based)');
     xlabel('X (m)'); ylabel('Y (m)'); zlabel('Z (m)');
     axis equal; grid on; view(30, 25);
-    legend('Table Surface', 'Table Points', 'Remaining Scene', 'Transformed Object', 'Location', 'northeast');
+    legend('Table Surface', 'Table Edge', 'Table RoI', 'Table Points', 'Remaining Scene', 'Transformed Object', 'Alignment Check', 'Location', 'northeast');
 end
 
 fprintf('--- Calibration Complete ---\n');

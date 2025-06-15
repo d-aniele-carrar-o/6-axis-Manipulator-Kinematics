@@ -18,18 +18,15 @@ figure('Name', 'Dual Robot Workspace');
 hold on; grid on;
 
 tableParams.height = tableHeight;
-tableParams.width = tableWidth;
+tableParams.width  = tableWidth;
 tableParams.length = tableLength;
+tableParams.roi    = tableRoI;
 
 axs = create_environment( tablePosition, tableParams );
 
-% --- File Paths ---
-% scenePcdPath = '/Users/danielecarraro/Documents/GITHUB/6-axis-Manipulator-Kinematics/pointclouds/pointcloud_25-06-07-11-21-29.ply';
-% objectPcdPath = '/Users/danielecarraro/Documents/GITHUB/6-axis-Manipulator-Kinematics/pointclouds/segmented_objects/pointcloud_25-06-07-11-21-29/object_00.ply';
-scenePcdPath = '/Users/danielecarraro/Documents/VSCODE/master-thesis/YOTO/output/pointcloud/pointcloud_25-06-12-18-11-36.ply';
-objectPcdPath = '/Users/danielecarraro/Documents/VSCODE/master-thesis/YOTO/output/segmented_objects/25-06-12-18-11-36/object_07.ply';
-% scenePcdPath = '/Volumes/Shared_part/realsense_data/pointcloud/pointcloud_25-06-12-12-05-30.ply';
-% objectPcdPath = '/Volumes/Shared_part/realsense_data/segmented_objects/25-06-12-12-05-30/object_02.ply';
+% ---------- File Paths ----------
+scenePcdPath = 'output/pointcloud/pointcloud_25-06-12-18-11-36.ply';
+objectPcdPath = 'output/pointcloud/pointcloud_25-06-12-18-11-36.ply';
 
 % Calibrate camera and transform object point cloud
 [tform_cam_to_world, ptCloudObject_world, ptCloudRemaining_world] = calibrate_camera( scenePcdPath, objectPcdPath, tableParams, true );

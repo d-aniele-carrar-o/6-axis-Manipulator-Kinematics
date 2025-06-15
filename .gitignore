@@ -7,3 +7,4 @@ src/.DS_Store
 *.png
 *.ply
 *.csv
+*.json

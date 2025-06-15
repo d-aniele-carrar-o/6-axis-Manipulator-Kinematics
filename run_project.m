@@ -19,6 +19,8 @@ end
 
 % Add subfolders
 addpath(fullfile(project_root, 'data'));
+addpath(fullfile(project_root, 'output'));
+addpath(fullfile(project_root, 'output/pointcloud'));
 addpath(fullfile(project_root, 'src', 'utils'));
 addpath(fullfile(project_root, 'src', 'plot_utils'));
 addpath(fullfile(project_root, 'src', '3_link_manipulators'));
@@ -39,5 +41,5 @@ clear; clc; close all;
 % Run the testing script
 % compile_cpp_code
 % testing_script;
-% dual_robot_setup;
-simulate_recorded_motion;
+dual_robot_setup;
+% simulate_recorded_motion;
