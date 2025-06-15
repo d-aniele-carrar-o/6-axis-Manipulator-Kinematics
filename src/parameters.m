@@ -22,10 +22,10 @@ function parameters( level, robot_id )
     space      = "task";
     % ["joint", "task"]
 
-    kinematics = "IDK";
+    kinematics = "IK";
     % ["IK", "IDK"]
 
-    traj_type  = "cubic";
+    traj_type  = "quintic";
     % ["LSPB", "cubic", "quintic"]
     
     if kinematics == "IDK"
@@ -129,8 +129,8 @@ function parameters( level, robot_id )
     % Define robot's world-to-base transformations
     if nargin > 1  % multi-robot setup
         robot_base_transforms = {
-            eul2tform(baseOrientation, "XYZ") * trvec2tform(basePosition + [0, -robotsDistance/2, standHeight]) * eul2tform(baseOrientation + [0, 0, pi], "XYZ");  % Robot LEFT  position
-            eul2tform(baseOrientation, "XYZ") * trvec2tform(basePosition + [0,  robotsDistance/2, standHeight])   % Robot RIGHT position
+            eul2tform(baseOrientation, "XYZ") * trvec2tform(basePosition + [0.1, -robotsDistance/2, standHeight]) * eul2tform(baseOrientation + [0, 0, pi], "XYZ");  % Robot LEFT  position
+            eul2tform(baseOrientation, "XYZ") * trvec2tform(basePosition + [0.1,  robotsDistance/2, standHeight])   % Robot RIGHT position
         };
     else
         robot_base_transforms = {eul2tform([0, 0, 0], "XYZ") * trvec2tform(basePosition + [0, -0.4, 0])};

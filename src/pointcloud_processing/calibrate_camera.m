@@ -410,11 +410,23 @@ else
     fprintf('   - Using default X-offset (table edge): %.3f m\n', xOffset);
 end
 
-% Apply the X-offset to create the world origin
-% The origin is at the center of the table (X=offset, Y=0) but at ground level (Z=0)
+% Calculate Y-offset to center the point cloud in the Y direction
+% Project all table points onto the XY plane of our new coordinate system
+tablePoints_projected = (R_cam_to_world * (tablePoints3D_cam - planeOrigin_cam)')';
+
+% Find the extent of the table in the Y direction
+minY = min(tablePoints_projected(:, 2));
+maxY = max(tablePoints_projected(:, 2));
+detectedTableWidth = maxY - minY;
+yOffset = -(minY + maxY) / 2;  % Offset to center the table in Y direction
+fprintf('   - Auto-detected table width: %.3f m\n', detectedTableWidth);
+fprintf('   - Setting Y-offset to center table: %.3f m\n', yOffset);
+
+% Apply the X and Y offsets to create the world origin
+% The origin is at the center of the table (X=xOffset, Y=yOffset) but at ground level (Z=0)
 % Table is at Z=tableHeight in world frame
 P_cam_origin = mean(edgeInlierPoints1, 1);
-P_world_origin = [xOffset, 0, tableHeight]; % Origin at ground level (Z=0)
+P_world_origin = [xOffset, yOffset, tableHeight]; % Origin at ground level (Z=0)
 
 % The transformation equation is: P_world = R * P_cam + T
 % So, T = P_world_origin' - R * P_cam_origin'
@@ -501,8 +513,12 @@ if showPlots
     plot3([0 0], [0 0], [0 0.2], 'b-', 'LineWidth', 3); text(0, 0.01, 0.2, 'World Z', 'Color', 'b'); hold on;
     
     % Visualize the table height (from ground up to table)
-    plot3([xOffset xOffset], [0 0], [0 tableHeight], 'k--', 'LineWidth', 2); hold on;
-    text(xOffset, 0.02, tableHeight/2, sprintf('Table Height: %.2f m', tableHeight), 'Color', 'k'); hold on;
+    plot3([xOffset xOffset], [yOffset yOffset], [0 tableHeight], 'k--', 'LineWidth', 2); hold on;
+    text(xOffset, yOffset+0.02, tableHeight/2, sprintf('Table Height: %.2f m', tableHeight), 'Color', 'k'); hold on;
+    
+    % Visualize the world origin and axes
+    plot3([0 0], [0 0], [0 tableHeight], 'k:', 'LineWidth', 2); hold on;
+    text(0, 0, tableHeight/2, 'World Origin', 'Color', 'k'); hold on;
     
     % Add coordinate axes at the detected table corners to verify alignment
     cornerSize = 0.1;

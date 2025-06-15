@@ -31,7 +31,7 @@ function [time, positions, velocities] = LSPB_trajectory( ti, tf, blend_perc, qi
         % Compute desired position and velocity from selected desired trajectory
         if space == "joint"
             for t=time
-                fprintf( "computing intermediate viapoints - t=%.4f\n", t )
+                % fprintf( "computing intermediate viapoints - t=%.4f\n", t )
 
                 [q_d, q_dot_d] = LSPB( t, ti, ti+T, tb, qi, qf, v );
                 
@@ -44,7 +44,7 @@ function [time, positions, velocities] = LSPB_trajectory( ti, tf, blend_perc, qi
             velocities = [velocities; zeros(1,6)];
             
             for t=time(2:end)
-                fprintf( "computing intermediate viapoints - t=%.4f\n", t )
+                % fprintf( "computing intermediate viapoints - t=%.4f\n", t )
 
                 [P, V]        = LSPB( t, ti, ti+T, tb, [ti, Ti(1:3,4)', 0], [ti+T, qf(1:3,4)', angle], [T/(T-tb), v] );
                 LSPB_time     = P(1);

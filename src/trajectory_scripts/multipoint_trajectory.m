@@ -5,12 +5,16 @@
 % - viapoints : viapoints through which trajectory will pass - could be
 %               expressed in joint space - [6xN] - or task space - [4x4xN]
 % - times     : time intervals for each piece of trajectory [N+1] 
-function [time, positions, velocities] = multipoint_trajectory( qi, viapoints, times )
-    parameters(1)
+function [time, positions, velocities] = multipoint_trajectory( qi, viapoints, times, robot_id )
+    % Handle optional arguments
+    if nargin < 4
+        robot_id = 1;
+    end
+    parameters(1, robot_id)
 
     % Number of viapoints - pieces of trajectory to generate
-    N = length( times ) - 1;
-    
+    N = length( times );
+
     % Determine viapoints space
     if size( viapoints, 1 ) > N
         % task space - [4x4xN] Hom-Transf matrices (end-effector poses)
@@ -26,13 +30,11 @@ function [time, positions, velocities] = multipoint_trajectory( qi, viapoints, t
     velocities = [];
     
     % Initial time
-    ti = times(1);
+    ti = 0;
     
     % TODO: use multithreading to compute every piece of trajectory at the same time
+    % Loop over the given viapoints
     for i=1:N
-        % Set final time to be previous finish time + new time interval for new piece of trajectory
-        % tf = ti + times(i+1);
-
         % Extract first viapoint - desired pose/configuration
         if     vp_space == "joint"
             % Desired configuration is already in joint space -> nothing to do
@@ -40,7 +42,7 @@ function [time, positions, velocities] = multipoint_trajectory( qi, viapoints, t
             
             if space == "taks"
                 % Transform desired configuration from joint to task space
-                qf = direct_kinematics_cpp( qf, AL, A, D, TH );
+                [~, qf] = direct_kinematics( qf, robot_id );
 
             end
 
@@ -54,7 +56,7 @@ function [time, positions, velocities] = multipoint_trajectory( qi, viapoints, t
                 elseif manipulator == "ABB"
                     Hf = ABB_inverse_kinematics_cpp( Tf(1:3,4), Tf(1:3,1:3), AL, A, D );
                 elseif manipulator == "custom"
-                    Hf  = Custom_manipulator_inverse_kinematics_cpp( Tf(1:3,4), Tf(1:3,1:3), AL, A, D, TH );
+                    Hf = Custom_manipulator_inverse_kinematics_cpp( Tf(1:3,4), Tf(1:3,1:3), AL, A, D, TH );
                 end
                 qf = get_closer( Hf, qi );
 
@@ -67,15 +69,15 @@ function [time, positions, velocities] = multipoint_trajectory( qi, viapoints, t
         end
 
         % Generate trajectory from current joint configuration to desired pose
-        fprintf("[multipoint_trajectory] generating piece of trajectory\n")
+        fprintf("[multipoint_trajectory] generating piece of trajectory for robot %d\n", robot_id)
         % TODO: fix cubic & quintic not working for ti != 0
-        [t, p, v] = generate_trajectory( qi, qf, 0, times(i+1) );
+        [t, p, v] = generate_trajectory( qi, qf, ti, ti+times(i), robot_id );
         
         time       = [time,    t+ti];
         positions  = [positions;  p];
         velocities = [velocities; v];
 
-        % Set final (of just computed piece of trajectory) = initial (for next piece of trajectory) configuration/pose
+        % Set final of just computed piece of trajectory equal to initial configuration/pose for next piece of trajectory
         if space == "joint" || kinematics == "IDK"
             % In this case, trajectory is given in joint space -> save last configuration
             qf = p(end,:);
@@ -90,14 +92,14 @@ function [time, positions, velocities] = multipoint_trajectory( qi, viapoints, t
             elseif manipulator == "custom"
                 Hf  = Custom_manipulator_inverse_kinematics_cpp( Tf(1:3,4), Tf(1:3,1:3), AL, A, D, TH );
             end
-
+            
             qf = get_closer( Hf, qi );
 
         end
         
         % Set initial configuration as last of previous trajectory
         qi = qf;
-        ti = t(end)
+        ti = ti + t(end);
 
     end
 

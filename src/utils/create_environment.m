@@ -4,7 +4,7 @@ function [axs] = create_environment(tablePosition, tableParams)
 
     xlimits = [-tableParams.length, tableParams.length];
     ylimits = [-tableParams.width,  tableParams.width];
-    zlimits = [-0.2,1.2];
+    zlimits = [-0.1,1.3];
     xlim(xlimits); ylim(ylimits); zlim(zlimits);
     xlabel('X [m]'); ylabel('Y [m]'); zlabel('Z [m]');
     view(0, 30); % Frontal view (looking along Y-axis toward the origin)

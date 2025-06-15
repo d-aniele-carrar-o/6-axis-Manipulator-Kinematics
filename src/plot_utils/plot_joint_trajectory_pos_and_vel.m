@@ -38,13 +38,13 @@ function plot_joint_trajectory_pos_and_vel( time, positions, velocities, space )
         end
 
         figure
-        plot( time, pos(:,1), '.-', time, pos(:,2), '.-', time, pos(:,3), '.-', time, pos(:,4), '.-' );
+        plot( time, pos(:,1), 'r.-', time, pos(:,2), 'g.-', time, pos(:,3), 'b.-', time, pos(:,4), '.-' );
         axis padded
         title( "Positions - Task space" )
         legend( 'x', 'y', 'z', 'angle' )
         
         figure
-        plot( time, reshape( velocities(:,1), [], 1), '.-', time, reshape( velocities(:,2), [], 1), '.-', time, reshape( velocities(:,3), [], 1), '.-', ...
+        plot( time, reshape( velocities(:,1), [], 1), 'r.-', time, reshape( velocities(:,2), [], 1), 'g.-', time, reshape( velocities(:,3), [], 1), 'b.-', ...
               time, reshape( velocities(:,4), [], 1), '.-', time, reshape( velocities(:,5), [], 1), '.-', time, reshape( velocities(:,6), [], 1), '.-' );
         axis padded
         title( "Velocities - Task space" )

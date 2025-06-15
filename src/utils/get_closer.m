@@ -14,12 +14,12 @@ function [best_q] = get_closer( H, q )
         end
     end
     
-    if best_dist > 0.1
-        disp("Warning: Large angular distance between solutions")
-        q
-        H
-        best_q
-    end
+    % if best_dist > 0.1
+    %     disp("!!!!   Warning: Large angular distance between solutions !!!!")
+    %     q
+    %     H
+    %     best_q
+    % end
 end
 
 function dist = angular_distance(q1, q2)
