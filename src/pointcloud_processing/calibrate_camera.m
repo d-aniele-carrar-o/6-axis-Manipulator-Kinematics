@@ -277,7 +277,7 @@ fprintf('     X·Y = %.6f, X·Z = %.6f, Y·Z = %.6f\n', xy_dot, xz_dot, yz_dot);
 % [X_cam, Y_cam, Z_cam] -> [World X, World Y, World Z]
 % Note: We need to swap X and Y and negate Z to match the world frame orientation
 % Form the rotation matrix with columns as the basis vectors
-R_cam_to_world_corrected = [X_cam; Y_cam; Z_cam];  % Note: X and Y are swapped to match world frame
+R_cam_to_world_corrected = [X_cam; Y_cam; Z_cam]';  % Note: X and Y are swapped to match world frame
 
 % Verify the rotation matrix is proper (det = 1)
 det_R = det(R_cam_to_world_corrected);
@@ -286,15 +286,6 @@ fprintf('   - Determinant of rotation matrix: %.6f (should be close to 1)\n', de
 % Ensure it's a proper rotation matrix (orthogonal with determinant 1)
 if abs(det_R - 1) > 0.01
     fprintf('   - Warning: Rotation matrix is not proper. Applying correction.\n');
-    
-    % If determinant is negative, we need to flip one axis to make it positive
-    if det_R < 0
-        fprintf('   - Determinant is negative, flipping Y axis to ensure proper rotation.\n');
-        R_cam_to_world_corrected(:,2) = -R_cam_to_world_corrected(:,2);
-        det_R = det(R_cam_to_world_corrected);
-        fprintf('   - New determinant after correction: %.6f\n', det_R);
-    end
-    
     % Ensure orthogonality using SVD
     [U, ~, V] = svd(R_cam_to_world_corrected);
     R_cam_to_world = U * V';

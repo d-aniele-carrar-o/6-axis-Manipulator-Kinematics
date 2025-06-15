@@ -18,9 +18,11 @@ else
 end
 
 % Add subfolders
+addpath(fullfile(project_root, 'src'));
 addpath(fullfile(project_root, 'data'));
 addpath(fullfile(project_root, 'output'));
 addpath(fullfile(project_root, 'output/pointcloud'));
+addpath(fullfile(project_root, 'output/segmented_objects'));
 addpath(fullfile(project_root, 'src', 'utils'));
 addpath(fullfile(project_root, 'src', 'plot_utils'));
 addpath(fullfile(project_root, 'src', '3_link_manipulators'));
@@ -36,7 +38,11 @@ addpath(fullfile(project_root, 'src', 'mex_compiled_functions'));
 % Change to src directory
 cd(fullfile(project_root, 'src'));
 
-clear; clc; close all;
+% Store the project root path in a global variable for access in other scripts
+global PROJECT_ROOT;
+PROJECT_ROOT = project_root;
+
+clc; close all;
 
 % Run the testing script
 % compile_cpp_code

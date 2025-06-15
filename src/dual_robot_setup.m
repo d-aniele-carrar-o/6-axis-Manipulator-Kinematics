@@ -25,8 +25,25 @@ tableParams.roi    = tableRoI;
 axs = create_environment( tablePosition, tableParams );
 
 % ---------- File Paths ----------
-scenePcdPath = 'output/pointcloud/pointcloud_25-06-12-18-11-36.ply';
-objectPcdPath = 'output/pointcloud/pointcloud_25-06-12-18-11-36.ply';
+% Use absolute paths to ensure files are found regardless of current directory
+project_root = fileparts(fileparts(mfilename('fullpath')));
+
+% Check if files exist and create dummy files if needed
+scenePcdPath = fullfile(project_root, 'output', 'pointcloud', 'pointcloud_25-06-12-18-11-36.ply');
+objectPcdPath = fullfile(project_root, 'output', 'segmented_objects', '25-06-12-18-11-36', 'object_00.ply');
+
+% Verify files exist
+if ~exist(scenePcdPath, 'file')
+    error('Scene point cloud file not found: %s', scenePcdPath);
+end
+
+if ~exist(objectPcdPath, 'file')
+    error('Object point cloud file not found: %s', objectPcdPath);
+end
+
+% Display file paths for debugging
+disp(['Using scene point cloud: ' scenePcdPath]);
+disp(['Using object point cloud: ' objectPcdPath]);
 
 % Calibrate camera and transform object point cloud
 [tform_cam_to_world, ptCloudObject_world, ptCloudRemaining_world] = calibrate_camera( scenePcdPath, objectPcdPath, tableParams, true );
