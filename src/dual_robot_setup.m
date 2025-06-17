@@ -28,51 +28,92 @@ axs = create_environment( tablePosition, tableParams );
 % Use absolute paths to ensure files are found regardless of current directory
 project_root = fileparts(fileparts(mfilename('fullpath')));
 
-% Check if files exist and create dummy files if needed
-scenePcdPath = fullfile(project_root, 'output', 'pointcloud', 'pointcloud_25-06-12-18-11-36.ply');
-objectPcdPath = fullfile(project_root, 'output', 'segmented_objects', '25-06-12-18-11-36', 'object_00.ply');
+% Define default paths to pointclouds
+default_scenePcdPath = fullfile(project_root, 'output', 'segmented_objects', '25-06-07-11-21-29', 'table_surface.ply');
+default_objectPcdPath = fullfile(project_root, 'output', 'segmented_objects', '25-06-07-11-21-29', 'object_01.ply');
 
-% Verify files exist
-if ~exist(scenePcdPath, 'file')
-    error('Scene point cloud file not found: %s', scenePcdPath);
+% Ask user if they want to use a single object or a directory of scenes
+fprintf('\n===== PROCESSING MODE SELECTION =====\n');
+useDirectory = true;
+fprintf('Using directory mode processing.\n');
+
+if useDirectory
+    % Get directory path from user
+    fprintf('\n===== DIRECTORY PATH INPUT =====\n');
+    dirPath = fullfile(project_root, 'output', 'augmented_demos', '25-06-07-11-21-29', 'scene_visualizations');
+    fprintf('Using directory: %s\n', dirPath);
+    
+    % Check if directory exists
+    if ~exist(dirPath, 'dir')
+        error('Directory not found: %s', dirPath);
+    end
+    
+    % Use default scene for calibration
+    scenePcdPath = default_scenePcdPath;
+    
+    % Display paths
+    disp(['Using calibration scene: ' scenePcdPath]);
+    disp(['Processing scenes from directory: ' dirPath]);
+    disp("------------------------------------------------");
+    
+    % Verify calibration file exists
+    if ~exist(scenePcdPath, 'file')
+        error('Calibration scene point cloud file not found: %s', scenePcdPath);
+    end
+    
+    % We'll process the directory later after setting up robots
+    isMultipleObjects = true;
+else
+    % Get paths for single object processing
+    fprintf('\n===== SCENE POINT CLOUD INPUT =====\n');
+    fprintf('Path to scene point cloud: %S\n', default_scenePcdPath);
+    scenePcdPath = default_scenePcdPath;
+    
+    fprintf('\n===== OBJECT POINT CLOUD INPUT =====\n');
+    fprintf('Path to object point cloud: %s\n', default_objectPcdPath);
+    objectPcdPath = default_objectPcdPath;
+    
+    % Verify files exist
+    if ~exist(scenePcdPath, 'file')
+        error('Scene point cloud file not found: %s', scenePcdPath);
+    end
+    
+    if ~exist(objectPcdPath, 'file')
+        error('Object point cloud file not found: %s', objectPcdPath);
+    end
+    disp("------------------------------------------------");
+    
+    % Calibrate camera and transform object point cloud
+    [tform_cam_to_world, ptCloudObject_world, ptCloudRemaining_world] = calibrate_camera(scenePcdPath, objectPcdPath, tableParams, true);
+    
+    % Display camera transformation
+    disp('Camera-to-world transformation:');
+    disp(tform_cam_to_world.A);
+    
+    % Add camera visualization
+    plotCamera('AbsolutePose', tform_cam_to_world, 'Size', 0.1, 'Color', 'b', 'Opacity', 0.5, 'Parent', axs);
+    text(tform_cam_to_world.Translation(1), tform_cam_to_world.Translation(2), tform_cam_to_world.Translation(3) + 0.1, ...
+        'Camera', 'Color', 'b', 'Parent', axs);
+    
+    % Add scene point cloud
+    pcshow(ptCloudRemaining_world.Location, [0.7 0.7 0.7], 'MarkerSize', 10);
+    
+    % Add object point cloud
+    pcshow(ptCloudObject_world.Location, 'r', 'MarkerSize', 30, 'Parent', axs);
+    text(mean(ptCloudObject_world.Location(:,1)), mean(ptCloudObject_world.Location(:,2)), mean(ptCloudObject_world.Location(:,3)) + 0.05, ...
+        'Object', 'Color', 'r', 'Parent', axs);
+    
+    % Display object position
+    object_centroid = mean(ptCloudObject_world.Location);
+    disp('Object centroid position in world frame:');
+    disp(object_centroid);
+    
+    isMultipleObjects = false;
 end
-
-if ~exist(objectPcdPath, 'file')
-    error('Object point cloud file not found: %s', objectPcdPath);
-end
-
-% Display file paths for debugging
-disp(['Using scene point cloud: ' scenePcdPath]);
-disp(['Using object point cloud: ' objectPcdPath]);
-
-% Calibrate camera and transform object point cloud
-[tform_cam_to_world, ptCloudObject_world, ptCloudRemaining_world] = calibrate_camera( scenePcdPath, objectPcdPath, tableParams, false );
-
-% Display camera transformation
-disp('Camera-to-world transformation:');
-disp(tform_cam_to_world.A);
-
-% Add camera visualization
-plotCamera('AbsolutePose', tform_cam_to_world, 'Size', 0.1, 'Color', 'b', 'Opacity', 0.5, 'Parent', axs);
-text(tform_cam_to_world.Translation(1), tform_cam_to_world.Translation(2), tform_cam_to_world.Translation(3) + 0.1, ...
-    'Camera', 'Color', 'b', 'Parent', axs);
-
-% Add scene point cloud
-pcshow(ptCloudRemaining_world.Location, [0.7 0.7 0.7], 'MarkerSize', 10);
-
-% Add object point cloud
-pcshow(ptCloudObject_world.Location, 'r', 'MarkerSize', 30, 'Parent', axs);
-text(mean(ptCloudObject_world.Location(:,1)), mean(ptCloudObject_world.Location(:,2)), mean(ptCloudObject_world.Location(:,3)) + 0.05, ...
-    'Object', 'Color', 'r', 'Parent', axs);
-
-% Display object position
-object_centroid = mean(ptCloudObject_world.Location);
-disp('Object centroid position in world frame:');
-disp(object_centroid);
 
 % Initial joint configurations --------------------------------------------------------------------
-q0_left  = [ pi/2,   -pi/3,  2*pi/3,   -pi/3,  pi/2, 0]
-q0_right = [-pi/2, -2*pi/3, -2*pi/3, -2*pi/3, -pi/2, 0]
+q0_left  = [ pi/2,   -pi/3,  2*pi/3,   -pi/3,  pi/2, 0];
+q0_right = [-pi/2, -2*pi/3, -2*pi/3, -2*pi/3, -pi/2, 0];
 % q0_left  = deg2rad([76.24, -31.87, 105.41, -73.01, 82.20, 8.99]);
 % q0_right = deg2rad([-64.75, -152.59, -88.65, -118.93, -57.61, 311.00]);
 
@@ -111,9 +152,27 @@ disp('Robot right end-effector pose (bTee):');
 disp(Te_r)
 disp('--------------------------------------')
 
-% Find grasp points on the object, passing initial robot poses to optimize orientations
-disp("Computing grasp point for given object:")
-[grasp_points, grasp_orientations] = find_object_grasp_points(ptCloudObject_world, Te_w_e_left, Te_w_e_right);
+% Process objects and find grasp points
+if isMultipleObjects
+    % Process directory of scenes
+    disp("Processing directory of scenes to find objects and grasp points...");
+    [allGraspPoints, allGraspOrientations] = process_scene_directory(dirPath, Te_w_e_left, Te_w_e_right, tableParams);
+    
+    % For now, we'll use the first object from the first scene for visualization and simulation
+    % In a real application, you might want to process each scene separately
+    if ~isempty(allGraspPoints) && ~isempty(allGraspPoints{1}) && ~isempty(allGraspPoints{1}{1})
+        grasp_points = allGraspPoints{1}{1};
+        grasp_orientations = allGraspOrientations{1}{1};
+        
+        disp('Using grasp points from first object in first scene:');
+    else
+        error('No valid grasp points found in the processed scenes.');
+    end
+else
+    % Find grasp points on the single object
+    disp("Computing grasp points for given object:");
+    [grasp_points, grasp_orientations] = find_object_grasp_points(ptCloudObject_world, Te_w_e_left, Te_w_e_right);
+end
 
 %%
 % Grasp points got from real robots for the box moving task:
@@ -159,8 +218,30 @@ for i = 1:2
 end
 
 view(90, 30); % Set frontal view of the table
-disp("Press enter to continue")
+fprintf('\n===== CONTINUE TO TRAJECTORY PLANNING =====\n');
+fprintf('Press Enter to continue to trajectory planning\n');
 pause()
+
+% If processing multiple scenes, offer to run the full processing pipeline
+if isMultipleObjects
+    fprintf('\n===== FULL PIPELINE OPTION =====\n');
+    fprintf('Do you want to run the full processing pipeline for all scenes?\n');
+    fprintf('This will process all objects in all scenes and generate trajectories for each\n');
+    runFullPipeline = input('Run full pipeline? [y/n]: ', 's');
+
+    if lower(runFullPipeline) == 'y'
+        fprintf('\nStarting full pipeline processing...\n');
+        
+        process_multiple_scenes(dirPath, tableParams, axs);
+        
+        return;  % End script here if full pipeline was run
+    
+    else
+        fprintf('\nContinuing with single object simulation using first object from first scene...\n');
+    
+    end
+
+end
 
 % Create trajectories for both robots -------------------------------------------------------------
 disp('Planning trajectories for both robots...');
