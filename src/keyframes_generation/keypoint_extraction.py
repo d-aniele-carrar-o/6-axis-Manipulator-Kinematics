@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from scipy.signal import savgol_filter, find_peaks
 from scipy.spatial.transform import Rotation, Slerp
+import os
 
 
 def parse_and_restructure_data(filepath: str) -> dict:
@@ -104,7 +105,7 @@ def preprocess_robot_data(df: pd.DataFrame, params: dict) -> pd.DataFrame:
         jerk = np.nan_to_num(jerk, nan=0.0, posinf=0.0, neginf=0.0)
         df[['jx', 'jy', 'jz']] = jerk
     except Exception as e:
-        print(f"Warning: Error in gradient calculation: {e}")
+        # print(f"Warning: Error in gradient calculation: {e}")
         # Fallback to simple finite differences if gradient fails
         acceleration = np.zeros_like(velocity_filtered)
         acceleration[1:] = (velocity_filtered[1:] - velocity_filtered[:-1]) / dt[:-1, np.newaxis]
@@ -280,15 +281,14 @@ def main():
         # Dynamic Events
         'force_contact_threshold': 5.0, # Newtons
         # Final Filtering
-        'min_time_separation_sec': 0.25, # seconds
+        'min_time_separation_sec': 1.0, # seconds
         # Similarity Filtering
-        'pos_similarity_threshold': 0.02,  # meters (2cm)
-        'ori_similarity_threshold': 0.1    # radians (~5.7 degrees)
+        'pos_similarity_threshold': 0.05,  # meters (5cm)
+        'ori_similarity_threshold': 0.3    # radians (~17.1 degrees)
     }
     
     # --- Load and Preprocess Data ---
-    # filepath = 'data/1749729939_motion.csv'
-    filepath = 'data/1749734485_motion.csv'
+    filepath = '/Users/danielecarraro/Documents/GITHUB/6-axis-Manipulator-Kinematics/good/data/1750265649_motion_move_unbalanced.csv'
     print(f"Loading and restructuring data from {filepath}...")
     all_robot_data_raw = parse_and_restructure_data(filepath)
     
@@ -300,11 +300,15 @@ def main():
 
     # --- Candidate Keyframe Generation ---
     candidate_indices = set()
+    # Dictionary to track which method found each keyframe
+    keyframe_methods = {}
     
     # Always include the first and last frame
     num_frames = len(all_robot_data_processed[1])
     candidate_indices.add(0)
     candidate_indices.add(num_frames - 1)
+    keyframe_methods[0] = "boundary"
+    keyframe_methods[num_frames - 1] = "boundary"
     
     print("\nGenerating candidate keyframes from all methods...")
     for robot_id, df in all_robot_data_processed.items():
@@ -318,17 +322,26 @@ def main():
             PARAMS['dp_epsilon_pos'], PARAMS['dp_epsilon_ori'],
             PARAMS['dp_weight_pos'], PARAMS['dp_weight_ori']
         )
-        candidate_indices.update(dp_indices)
+        for idx in dp_indices:
+            candidate_indices.add(idx)
+            if idx not in keyframe_methods:  # Don't overwrite boundary frames
+                keyframe_methods[idx] = "geometric"
         print(f"    - DP found {len(dp_indices)} keyframes.")
 
         # B. Kinematic Extrema
         kinematic_indices = get_kinematic_extrema(df, PARAMS)
-        candidate_indices.update(kinematic_indices)
+        for idx in kinematic_indices:
+            candidate_indices.add(idx)
+            if idx not in keyframe_methods:
+                keyframe_methods[idx] = "kinematic"
         print(f"    - Kinematics found {len(kinematic_indices)} keyframes.")
 
         # C. Dynamic Events
         dynamic_indices = get_dynamic_events(df, PARAMS)
-        candidate_indices.update(dynamic_indices)
+        for idx in dynamic_indices:
+            candidate_indices.add(idx)
+            if idx not in keyframe_methods:
+                keyframe_methods[idx] = "dynamic"
         print(f"    - Dynamics found {len(dynamic_indices)} keyframes.")
 
     # --- Synchronization and Final Filtering ---
@@ -356,6 +369,10 @@ def main():
              final_keyframes.append(num_frames - 1)
         else: # Replace the last one if it's too close
             final_keyframes[-1] = num_frames - 1
+            
+    # Make sure the method for the last frame is preserved
+    if num_frames - 1 in final_keyframes and num_frames - 1 not in keyframe_methods:
+        keyframe_methods[num_frames - 1] = "boundary"
     
     # Store the count after time-based filtering        
     time_filtered_count = len(final_keyframes)
@@ -397,16 +414,30 @@ def main():
     print("\n--- FINAL KEYFRAME INDICES ---")
     print(sorted(final_keyframes))
     
-    # Save keyframes to CSV file for MATLAB
+    # Save keyframes to CSV file with extraction method
     keyframe_indices = sorted(final_keyframes)
     
-    # Method 1: Save just the indices to a simple CSV file
-    output_kf_filepath = filepath.replace('.csv', '_keyframe_indices.csv')
-    with open(output_kf_filepath, 'w') as f:
-        f.write('keyframe_idx\n')  # Header
-        for idx in keyframe_indices:
-            f.write(f'{idx}\n')
-    print(f"\nKeyframe indices saved to {output_kf_filepath}")
+    # Create a list of methods for the final keyframes
+    # If a keyframe was filtered out during time or similarity filtering, its method won't be in the final list
+    final_methods = []
+    for idx in keyframe_indices:
+        method = keyframe_methods.get(idx, "unknown")
+        # If this is a keyframe that survived filtering, add its method
+        final_methods.append(method)
+    
+    # Save indices and methods to a CSV file in the same directory as the original file
+    original_dir = os.path.dirname(filepath)
+    original_filename = os.path.basename(filepath)
+    output_filename = os.path.splitext(original_filename)[0] + "_keyframe_indxs.csv"
+    output_kf_filepath = os.path.join(original_dir, output_filename)
+    
+    # Save as DataFrame for better formatting
+    kf_df = pd.DataFrame({
+        'keyframe_idx': keyframe_indices,
+        'extraction_method': final_methods
+    })
+    kf_df.to_csv(output_kf_filepath, index=False)
+    print(f"\nKeyframe indices and methods saved to {output_kf_filepath}")
     
     # Method 2: Add a keyframe column to the original CSV
     try:

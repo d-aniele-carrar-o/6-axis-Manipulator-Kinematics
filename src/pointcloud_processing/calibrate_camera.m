@@ -110,7 +110,7 @@ if showPlots
 end
 
 % Fit plane using only points within RoI
-[planeModel, inlierIndicesRoI, outlierIndicesRoI] = pcfitplane(ptCloudRoI, ...
+[planeModel, inlierIndicesRoI, ~] = pcfitplane(ptCloudRoI, ...
     planeMaxDistance, planeReferenceVector, maxAngularDistance);
 
 % Map RoI inliers back to original point cloud indices
@@ -468,7 +468,7 @@ if showPlots
     figure('Name', 'Final Calibrated Simulation Scene (Two-Edge Based)', 'Position', [100, 100, 1000, 800]);
     
     % Create a simulated table surface (tableLength x tableWidth centered at world origin)
-    [X, Y] = meshgrid([-tableLength/2:0.05:tableLength/2], [-tableWidth/2:0.05:tableWidth/2]);
+    [X, Y] = meshgrid(-tableLength/2:0.05:tableLength/2, -tableWidth/2:0.05:tableWidth/2);
     Z = zeros(size(X)) + tableHeight;  % Table is at Z=tableHeight in world frame
     surf(X, Y, Z, 'FaceColor', [0.8 0.7 0.6], 'FaceAlpha', 0.3, 'EdgeColor', 'none'); hold on;
     
@@ -483,7 +483,6 @@ if showPlots
     % and camera X is aligned with world Y
     roi_y = tableRoI(1);  % Camera X -> World Y
     roi_x = tableRoI(2);  % Camera Y -> World X
-    roi_z = tableRoI(3);
     roi_corners = [
         -roi_x/2, -roi_y/2, tableHeight;
         roi_x/2, -roi_y/2, tableHeight;
@@ -500,7 +499,7 @@ if showPlots
     pcshow(ptCloudObject_world.Location, 'r', 'MarkerSize', 50); hold on;
     
     % Add a horizontal plane at table height to check alignment
-    [checkX, checkY] = meshgrid([-0.1:0.05:0.1], [-0.1:0.05:0.1]);
+    [checkX, checkY] = meshgrid(-0.1:0.05:0.1, -0.1:0.05:0.1);
     checkZ = zeros(size(checkX)) + tableHeight;
     surf(checkX, checkY, checkZ, 'FaceColor', [0 0.5 1], 'FaceAlpha', 0.2, 'EdgeColor', 'none'); hold on;
     

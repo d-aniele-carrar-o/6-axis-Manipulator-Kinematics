@@ -114,14 +114,11 @@ function parameters( level, robot_id )
     % Set table dimensions
     tableHeight    = 0.6;
     tableWidth     = 1.5;
-    tableLength    = 0.7;
+    tableLength    = 0.75;
     tablePosition  = [0.0, 0.0, tableHeight];
-    % tableRoI       = [1.0, 0.8, 0.5];  % RoI for plane fitting in camera coords
-    tableRoI       = [0.5, 0.5, 0.1];  % RoI for plane fitting in camera coords
-    % standHeight    = 0.215;
-    standHeight    = 0;
-    robotsDistance = 1.365;  % Distance between robot's base origins
-    % robotsDistance = 1.1;  % Distance between robot's base origins
+    tableRoI       = [1.0, 0.8, 0.5];  % RoI for plane fitting in camera coords
+    standHeight    = 0.215;
+    robotsDistance = 1.27;  % Distance between robot's base origins
 
     % Eventual transformation between World Reference Frame and Frame 0
     % Create a base link with the desired position and orientation
@@ -133,12 +130,12 @@ function parameters( level, robot_id )
     if nargin > 1  % multi-robot setup
         robot_base_transforms = {
             % Robot LEFT  pose
-            eul2tform(baseOrientation, "XYZ") * trvec2tform(basePosition + [0.1, -robotsDistance/2, standHeight]) * eul2tform(baseOrientation + [0, 0, pi], "XYZ");
+            eul2tform(baseOrientation, "XYZ") * trvec2tform(basePosition + [0, -robotsDistance/2, standHeight]) * eul2tform(baseOrientation + [0, 0, pi], "XYZ");
             % Robot RIGHT pose
-            eul2tform(baseOrientation, "XYZ") * trvec2tform(basePosition + [0.1,  robotsDistance/2, standHeight])
+            eul2tform(baseOrientation, "XYZ") * trvec2tform(basePosition + [0,  robotsDistance/2, standHeight])
         };
     else
-        robot_base_transforms = {eul2tform([0, 0, 0], "XYZ") * trvec2tform(basePosition + [0, -0.4, 0])};
+        robot_base_transforms = {eul2tform([0, 0, 0], "XYZ") * trvec2tform(basePosition + [0, -0.4, 0] ) * eul2tform(baseOrientation + [0, 0, pi], "XYZ")};
     end
     
     Trf_0 = robot_base_transforms{robot_id};

@@ -1,19 +1,34 @@
-function [best_q] = get_closer( H, q )
-    % Initialize with first solution
-    best_q = H(1,:);
+function [best_q] = get_closer(H, q)
+    % Find the solution in H that is closest to q, ignoring solutions with NaN values
     
-    % Calculate angular distance considering joint angle wrapping
-    best_dist = angular_distance(H(1,:), q);
+    % Initialize variables
+    best_q = [];
+    best_dist = Inf;
     
-    % Check all other solutions
-    for i=2:8
+    % Check all solutions
+    for i=1:size(H,1)
+        % Skip solutions with NaN values
+        if any(isnan(H(i,:)))
+            continue;
+        end
+        
+        % Calculate angular distance considering joint angle wrapping
         curr_dist = angular_distance(H(i,:), q);
+        
+        % Update best solution if current is better
         if curr_dist < best_dist
             best_dist = curr_dist;
             best_q = H(i,:);
         end
     end
     
+    % If no valid solution was found (all rows contain NaN), return the input q
+    if isempty(best_q)
+        warning('All solutions contain NaN values. Returning input q as fallback.');
+        best_q = q;
+    end
+    
+    % Optional warning for large angular distances
     % if best_dist > 0.1
     %     disp("!!!!   Warning: Large angular distance between solutions !!!!")
     %     q

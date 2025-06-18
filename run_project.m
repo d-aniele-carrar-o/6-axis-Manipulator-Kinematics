@@ -47,5 +47,6 @@ clc; close all;
 % Run the testing script
 % compile_cpp_code
 % testing_script;
-dual_robot_setup;
-% simulate_recorded_motion;
+% dual_robot_setup;
+simulate_recorded_motion;
+% calibrate_robot_bases
