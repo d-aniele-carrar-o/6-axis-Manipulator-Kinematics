@@ -260,9 +260,13 @@ def filter_similar_keyframes(indices, pos_data, ori_data, pos_threshold=0.01, or
     
     return filtered_indices
 
-def main():
+def main(filepath=None, params=None):
     """
     Main function to run the keyframe extraction pipeline.
+    
+    Args:
+        filepath: Path to the motion CSV file. If None, uses default.
+        params: Dictionary of parameters to override defaults.
     """
     # --- Parameters ---
     # These parameters can be tuned to change the algorithm's behavior.
@@ -281,14 +285,25 @@ def main():
         # Dynamic Events
         'force_contact_threshold': 5.0, # Newtons
         # Final Filtering
-        'min_time_separation_sec': 1.0, # seconds
+        'min_time_separation_sec': 0.6, # seconds
         # Similarity Filtering
-        'pos_similarity_threshold': 0.05,  # meters (5cm)
-        'ori_similarity_threshold': 0.3    # radians (~17.1 degrees)
+        'pos_similarity_threshold': 0.02,  # meters (5cm)
+        'ori_similarity_threshold': 0.2,   # radians (~17.1 degrees)
+        # Method Selection (True to use, False to ignore)
+        'use_geometric': True,      # Use geometric simplification (Douglas-Peucker)
+        'use_kinematic': True,      # Use kinematic extrema (velocity minima, jerk maxima)
+        'use_dynamic': True         # Use dynamic events (force/torque thresholds)
     }
     
+    # Override parameters if provided
+    if params:
+        for key, value in params.items():
+            if key in PARAMS:
+                PARAMS[key] = value
+    
     # --- Load and Preprocess Data ---
-    filepath = '/Users/danielecarraro/Documents/GITHUB/6-axis-Manipulator-Kinematics/good/data/1750265649_motion_move_unbalanced.csv'
+    if filepath is None:
+        filepath = '/Users/danielecarraro/Documents/GITHUB/6-axis-Manipulator-Kinematics/good/data/1750265649_motion_move_unbalanced.csv'
     print(f"Loading and restructuring data from {filepath}...")
     all_robot_data_raw = parse_and_restructure_data(filepath)
     
@@ -300,7 +315,7 @@ def main():
 
     # --- Candidate Keyframe Generation ---
     candidate_indices = set()
-    # Dictionary to track which method found each keyframe
+    # Dictionary to track which methods found each keyframe
     keyframe_methods = {}
     
     # Always include the first and last frame
@@ -310,45 +325,95 @@ def main():
     keyframe_methods[0] = "boundary"
     keyframe_methods[num_frames - 1] = "boundary"
     
-    print("\nGenerating candidate keyframes from all methods...")
+    print("\nGenerating candidate keyframes from selected methods...")
+    active_methods = []
+    if PARAMS['use_geometric']:
+        active_methods.append("Geometric (Douglas-Peucker)")
+    if PARAMS['use_kinematic']:
+        active_methods.append("Kinematic extrema")
+    if PARAMS['use_dynamic']:
+        active_methods.append("Dynamic events")
+    print(f"  Active methods: {', '.join(active_methods)}")
+    
     for robot_id, df in all_robot_data_processed.items():
         print(f"  Processing Robot {robot_id}...")
         
         # A. Geometric Simplification (Douglas-Peucker)
-        pos_points = df[['x_filtered', 'y_filtered', 'z_filtered']].values
-        ori_points = [Rotation.from_quat(q) for q in df['quaternion']]
-        dp_indices = douglas_peucker_6d(
-            pos_points, ori_points,
-            PARAMS['dp_epsilon_pos'], PARAMS['dp_epsilon_ori'],
-            PARAMS['dp_weight_pos'], PARAMS['dp_weight_ori']
-        )
-        for idx in dp_indices:
-            candidate_indices.add(idx)
-            if idx not in keyframe_methods:  # Don't overwrite boundary frames
-                keyframe_methods[idx] = "geometric"
-        print(f"    - DP found {len(dp_indices)} keyframes.")
+        if PARAMS['use_geometric']:
+            pos_points = df[['x_filtered', 'y_filtered', 'z_filtered']].values
+            ori_points = [Rotation.from_quat(q) for q in df['quaternion']]
+            dp_indices = douglas_peucker_6d(
+                pos_points, ori_points,
+                PARAMS['dp_epsilon_pos'], PARAMS['dp_epsilon_ori'],
+                PARAMS['dp_weight_pos'], PARAMS['dp_weight_ori']
+            )
+            for idx in dp_indices:
+                candidate_indices.add(idx)
+                if idx not in keyframe_methods:  # First method for this keyframe
+                    keyframe_methods[idx] = "geometric"
+                elif keyframe_methods[idx] != "boundary":  # Don't modify boundary frames
+                    if "geometric" not in keyframe_methods[idx]:  # Avoid duplicates
+                        keyframe_methods[idx] += "/geometric"
+            print(f"    - DP found {len(dp_indices)} keyframes.")
+        else:
+            print(f"    - Geometric method disabled.")
 
         # B. Kinematic Extrema
-        kinematic_indices = get_kinematic_extrema(df, PARAMS)
-        for idx in kinematic_indices:
-            candidate_indices.add(idx)
-            if idx not in keyframe_methods:
-                keyframe_methods[idx] = "kinematic"
-        print(f"    - Kinematics found {len(kinematic_indices)} keyframes.")
+        if PARAMS['use_kinematic']:
+            kinematic_indices = get_kinematic_extrema(df, PARAMS)
+            for idx in kinematic_indices:
+                candidate_indices.add(idx)
+                if idx not in keyframe_methods:  # First method for this keyframe
+                    keyframe_methods[idx] = "kinematic"
+                elif keyframe_methods[idx] != "boundary":  # Don't modify boundary frames
+                    if "kinematic" not in keyframe_methods[idx]:  # Avoid duplicates
+                        keyframe_methods[idx] += "/kinematic"
+            print(f"    - Kinematics found {len(kinematic_indices)} keyframes.")
+        else:
+            print(f"    - Kinematic method disabled.")
 
         # C. Dynamic Events
-        dynamic_indices = get_dynamic_events(df, PARAMS)
-        for idx in dynamic_indices:
-            candidate_indices.add(idx)
-            if idx not in keyframe_methods:
-                keyframe_methods[idx] = "dynamic"
-        print(f"    - Dynamics found {len(dynamic_indices)} keyframes.")
+        if PARAMS['use_dynamic']:
+            dynamic_indices = get_dynamic_events(df, PARAMS)
+            for idx in dynamic_indices:
+                candidate_indices.add(idx)
+                if idx not in keyframe_methods:  # First method for this keyframe
+                    keyframe_methods[idx] = "dynamic"
+                elif keyframe_methods[idx] != "boundary":  # Don't modify boundary frames
+                    if "dynamic" not in keyframe_methods[idx]:  # Avoid duplicates
+                        keyframe_methods[idx] += "/dynamic"
+            print(f"    - Dynamics found {len(dynamic_indices)} keyframes.")
+        else:
+            print(f"    - Dynamic method disabled.")
 
     # --- Synchronization and Final Filtering ---
     print(f"\nTotal unique candidate keyframes before filtering: {len(candidate_indices)}")
     
+    # Filter keyframes based on selected methods
+    filtered_indices = []
+    for idx in candidate_indices:
+        # Always include boundary frames
+        if idx == 0 or idx == num_frames - 1:
+            filtered_indices.append(idx)
+            continue
+            
+        method = keyframe_methods.get(idx, "")
+        methods_list = method.split('/')
+        
+        # Check if any of the active methods identified this keyframe
+        keep = False
+        if PARAMS['use_geometric'] and "geometric" in methods_list:
+            keep = True
+        elif PARAMS['use_kinematic'] and "kinematic" in methods_list:
+            keep = True
+        elif PARAMS['use_dynamic'] and "dynamic" in methods_list:
+            keep = True
+            
+        if keep:
+            filtered_indices.append(idx)
+    
     # Sort all candidate indices chronologically
-    sorted_indices = sorted(list(candidate_indices))
+    sorted_indices = sorted(filtered_indices)
     
     # Filter out keyframes that are too close in time
     final_keyframes = []
@@ -424,6 +489,35 @@ def main():
         method = keyframe_methods.get(idx, "unknown")
         # If this is a keyframe that survived filtering, add its method
         final_methods.append(method)
+        
+    # Print statistics about methods used
+    multi_method_count = sum(1 for method in final_methods if "/" in method)
+    print(f"\nKeyframes identified by multiple methods: {multi_method_count} ({(multi_method_count/len(final_methods))*100:.1f}%)")
+    
+    # Count keyframes by method
+    method_counts = {
+        "boundary": 0,
+        "geometric": 0,
+        "kinematic": 0,
+        "dynamic": 0
+    }
+    
+    for method in final_methods:
+        methods_list = method.split('/')
+        for m in methods_list:
+            if m in method_counts:
+                method_counts[m] += 1
+    
+    # Print method statistics
+    print("\nKeyframes by method:")
+    for method, count in method_counts.items():
+        if method == "boundary":
+            print(f"  - {method}: {count} (always included)")
+        else:
+            if PARAMS[f'use_{method}']:
+                print(f"  - {method}: {count} ({(count/len(final_methods))*100:.1f}%)")
+            else:
+                print(f"  - {method}: 0 (disabled)")
     
     # Save indices and methods to a CSV file in the same directory as the original file
     original_dir = os.path.dirname(filepath)
@@ -459,4 +553,31 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    import argparse
+    
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='Extract keyframes from motion data.')
+    parser.add_argument('--filepath', type=str, help='Path to the motion CSV file')
+    parser.add_argument('--methods', type=str, default='all', 
+                        help='Comma-separated list of methods to use: geometric,kinematic,dynamic or "all"')
+    
+    args = parser.parse_args()
+    
+    # Prepare parameters
+    params = {}
+    
+    # Override methods based on command line arguments
+    if args.methods != 'all':
+        # Set all methods to False by default
+        params['use_geometric'] = False
+        params['use_kinematic'] = False
+        params['use_dynamic'] = False
+        
+        # Enable only the specified methods
+        methods = args.methods.split(',')
+        for method in methods:
+            method = method.strip().lower()
+            if method in ['geometric', 'kinematic', 'dynamic']:
+                params[f'use_{method}'] = True
+    
+    main(filepath=args.filepath, params=params)

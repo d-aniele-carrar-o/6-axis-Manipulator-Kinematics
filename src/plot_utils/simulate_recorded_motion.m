@@ -260,7 +260,7 @@ if use_keyframes
         title(title_text, 'FontSize', 14);
         
         % Pause to control animation speed
-        pause(0.5); % Longer pause for keyframes to better see each pose
+        pause(1); % Longer pause for keyframes to better see each pose
         
         % Break if figure is closed
         if ~ishandle(axs.Parent)
