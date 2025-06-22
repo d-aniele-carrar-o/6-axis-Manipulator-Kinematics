@@ -18,16 +18,18 @@ if simple_traj_trans
 
     disp("Press any key to continue")
     pause()
-end
 
-% Test advanced transformation
-options.visualize = false;
-options.interaction_threshold = 0.25;
-options.simulate = true;
+else
+    % Test advanced transformation
+    options.visualize = false;
+    options.interaction_threshold = 0.25;
+    options.simulate = true;
 
-try
-    advanced_trajectory_transform(timestamp, augmentation_id, options);
-    fprintf('✓ Advanced transformation successful\n');
-catch ME
-    fprintf('✗ Advanced transformation failed: %s\n', ME.message);
+    try
+        advanced_trajectory_transform(timestamp, augmentation_id, options);
+        fprintf('✓ Advanced transformation successful\n');
+    catch ME
+        fprintf('✗ Advanced transformation failed: %s\n', ME.message);
+    end
+
 end

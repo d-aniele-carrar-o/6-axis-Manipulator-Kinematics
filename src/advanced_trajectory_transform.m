@@ -72,16 +72,14 @@ motion_file = find_closest_motion_file(timestamp);
 if isempty(motion_file)
     error('No motion data found for timestamp %s', timestamp);
 end
-[q_left_orig, q_right_orig, keyframe_indices] = load_motion_data_simple(motion_file);
+[q_left_orig, q_right_orig, poses_left_all, poses_right_all, keyframe_indices] = load_motion_data_simple(motion_file);
 
 % Analyze trajectory for object interactions
-interaction_points = analyze_trajectory_interactions(q_left_orig, q_right_orig, ...
-    original_objects, options.interaction_threshold);
+interaction_points = analyze_trajectory_interactions(poses_left_all, poses_right_all, original_objects, motion_file, options.interaction_threshold);
 
 % Transform trajectory based on interactions
 [q_left_new, q_right_new] = transform_trajectory_advanced(...
-    q_left_orig, q_right_orig, interaction_points, ...
-    original_objects, transformed_objects);
+    q_left_orig, q_right_orig, interaction_points, transformations);
 
 % Visualize if requested
 if options.visualize
@@ -98,6 +96,8 @@ end
 
 % Simulate if requested
 if options.simulate
+    disp("Press enter to proceed with the simulation...")
+    pause()
     simulate_transformed_trajectory(timestamp, augmentation_id, ...
         q_left_new, q_right_new, keyframe_indices, ...
         data_folder, object_paths, transformations);
@@ -109,19 +109,66 @@ end
 
 
 
-function interaction_points = analyze_trajectory_interactions(q_left, q_right, objects, threshold)
-% Analyze trajectory to find object interaction points
+function interaction_points = analyze_trajectory_interactions(poses_left_all, ...
+    poses_right_all, objects, motion_file, threshold)
+% Read keyframes data to find object interaction points
+
+    % Load keyframes data
+    data_folder = '/Users/danielecarraro/Documents/VSCODE/data/data';
+
+    % Remove .csv extension
+    [~, name, ~] = fileparts(motion_file);
+
+    % Construct search pattern
+    searchPattern = [name, '_keyframes.csv'];
+
+    % Search the folder
+    keyframesInfo = dir(fullfile(data_folder, searchPattern));
+
+    if ~isempty(keyframesInfo)
+        motion_keyframes_file = fullfile(data_folder, keyframesInfo(1).name);
+        fprintf('Found keyframes file: %s\n', motion_keyframes_file);
+        
+        % Load the table
+        data = readtable(motion_keyframes_file);
+    else
+        error('Keyframes file not found: %s\n', fullfile(data_folder, searchPattern));
+    end
     
+    num_poses = size(poses_left_all, 1);
+    num_keyframes = height(data);
+    
+    ee_left  = zeros(2, 3);
+    ee_right = zeros(2, 3);
+    kf_idx = 1;
+
+    for i = 1:num_keyframes
+        idx    = data.original_index(i);
+        method = data.extraction_method(i);
+
+        if method == "grasp_ungrasp_r2"
+            pose_idx = floor(idx / num_poses);
+            pose_idx = max(1, min(pose_idx, num_poses)); % ensure valid bounds
+            
+            ee_left(kf_idx, :)  = poses_left_all(pose_idx, 1:3, 4);
+            ee_right(kf_idx, :) = poses_right_all(pose_idx, 1:3, 4);
+            
+            kf_idx = kf_idx + 1;
+        end
+    end
+    for kf = 1:size(ee_left, 1)
+        fprintf("Left robot ee pos:  [%.3f, %.3f, %.3f]\n", ee_left(kf,:));
+        fprintf("Right robot ee pos: [%.3f, %.3f, %.3f]\n", ee_right(kf,:));
+    end
+    
+    fprintf("Found grasp points:\n")
+
     interaction_points = struct();
     interaction_points.left = [];
     interaction_points.right = [];
     interaction_points.objects = [];
     
-    % Get end-effector trajectories
-    ee_left = get_end_effector_trajectory(q_left, 1);
-    ee_right = get_end_effector_trajectory(q_right, 2);
-    
-    % Find interactions for each object
+    % Find interactions for each interaction keyframe and object
     for obj_idx = 1:length(objects)
         obj_center = objects{obj_idx};
         fprintf('Checking object %d at [%.3f, %.3f, %.3f] with threshold %.3f\n', ...
@@ -130,14 +177,14 @@ function interaction_points = analyze_trajectory_interactions(q_left, q_right, o
         % Check left robot interactions
         min_dist_left = inf;
         for i = 1:size(ee_left, 1)
-            dist = norm(ee_left(i, :) - obj_center);
+            dist = norm(ee_left(i,:) - obj_center);
             if dist < min_dist_left
                 min_dist_left = dist;
             end
             if dist < threshold
                 interaction_points.left = [interaction_points.left; i];
                 interaction_points.objects = [interaction_points.objects; obj_idx];
-                fprintf('  Left robot interaction at frame %d, dist=%.3f\n', i, dist);
+                fprintf('  Left robot interaction at frame %d, dist=%.3f\n', data.original_index(i), dist);
                 break; % Only record first interaction per object
             end
         end
@@ -155,10 +202,11 @@ function interaction_points = analyze_trajectory_interactions(q_left, q_right, o
                 if length(interaction_points.objects) < obj_idx
                     interaction_points.objects = [interaction_points.objects; obj_idx];
                 end
-                fprintf('  Right robot interaction at frame %d, dist=%.3f\n', i, dist);
+                fprintf('  Right robot interaction at frame %d, dist=%.3f\n', data.original_index(i), dist);
                 break;
             end
         end
+
         fprintf('  Min distance to right robot: %.3f\n', min_dist_right);
     end
     
@@ -173,25 +221,21 @@ function ee_trajectory = get_end_effector_trajectory(q_trajectory, robot_id)
     for i = 1:size(q_trajectory, 1)
         parameters(1, robot_id);
         [T_ee, ~] = direct_kinematics(q_trajectory(i, :), robot_id);
-        ee_trajectory(i, :) = T_ee(1:3, 4)';
+        ee_trajectory(i,:) = T_ee(1:3, 4)';
     end
 end
 
-function [q_left_new, q_right_new] = transform_trajectory_advanced(...
-    q_left_orig, q_right_orig, interaction_points, orig_objects, new_objects)
+function [q_left_new, q_right_new] = transform_trajectory_advanced(q_left_orig, q_right_orig, interaction_points, transformations)
 % Advanced trajectory transformation considering multiple interaction points
+    disp("[transform_trajectory_advanced] starting")
     
     q_left_new = q_left_orig;
     q_right_new = q_right_orig;
     
     % Calculate object displacements
-    displacements = cell(length(orig_objects), 1);
-    for i = 1:length(orig_objects)
-        if i <= length(new_objects)
-            displacements{i} = new_objects{i} - orig_objects{i};
-        else
-            displacements{i} = [0, 0, 0];
-        end
+    displacements = cell(length(transformations), 1);
+    for i = 1:length(transformations)
+        displacements{i} = transformations(i).translation;
     end
     
     % Apply transformations at interaction points
@@ -220,23 +264,18 @@ function q_new = apply_displacement_to_trajectory(q_orig, displacement, start_fr
     
     % Get robot base transformation
     parameters(1, robot_id);
-    if robot_id == 1
-        [~, Te_base] = direct_kinematics(q_orig(1,:), 1);
-    else
-        [~, Te_base] = direct_kinematics(q_orig(1,:), 2);
-    end
     
     % Apply displacement from start_frame onwards
     for i = start_frame:size(q_orig, 1)
         % Get current end-effector pose
-        [Te_ee, ~] = direct_kinematics(q_orig(i,:), robot_id);
+        [T_w_ee, ~] = direct_kinematics(q_orig(i,:), robot_id);
         
         % Apply displacement
-        Te_ee_new = Te_ee;
-        Te_ee_new(1:3, 4) = Te_ee_new(1:3, 4) + displacement';
+        T_w_ee_new = T_w_ee;
+        T_w_ee_new(1:3, 4) = T_w_ee_new(1:3, 4) + displacement;
         
         % Convert to robot base frame
-        Tf_new = Te_base \ Te_ee_new;
+        Tf_new = Trf_0 \ T_w_ee_new;
         
         % Solve inverse kinematics
         try
@@ -427,7 +466,7 @@ function time_val = parse_timestamp(timestamp_str)
     end
 end
 
-function [q_left_all, q_right_all, keyframe_indices] = load_motion_data_simple(motion_file)
+function [q_left_all, q_right_all, poses_left_all, poses_right_all, keyframe_indices] = load_motion_data_simple(motion_file)
     data = readtable(motion_file);
     
     left = 4; right = 2;
@@ -445,19 +484,22 @@ function [q_left_all, q_right_all, keyframe_indices] = load_motion_data_simple(m
     step = 50;
     num_frames = floor(height(data)/step);
     
-    q_left_all = zeros(num_frames, 6);
+    q_left_all  = zeros(num_frames, 6);
     q_right_all = zeros(num_frames, 6);
+
+    poses_left_all  = zeros(num_frames, 4, 4);
+    poses_right_all = zeros(num_frames, 4, 4);
     
     q0_left  = [pi/2, -pi/3, 2*pi/3, -pi/3, pi/2, 0];
     q0_right = [-pi/2, -2*pi/3, -2*pi/3, -2*pi/3, -pi/2, 0];
     
-    q_left = q0_left;
+    q_left  = q0_left;
     q_right = q0_right;
     
-    parameters(1, 1); [~, Te_l] = direct_kinematics(q0_left, 1);
-    parameters(1, 2); [~, Te_r] = direct_kinematics(q0_right, 2);
+    parameters(1, 1); [Te_w_l, Te_l] = direct_kinematics(q0_left, 1);
+    parameters(1, 2); [Te_w_r, Te_r] = direct_kinematics(q0_right, 2);
     
-    for i = 2:num_frames
+    for i = 1:num_frames
         idx = (i-1)*step + 1;
         
         pos_rel_l = [data.(robot_cols(left).x)(idx); data.(robot_cols(left).y)(idx); data.(robot_cols(left).z)(idx)];
@@ -469,6 +511,7 @@ function [q_left_all, q_right_all, keyframe_indices] = load_motion_data_simple(m
         else
             rot_left = Te_l(1:3,1:3);
         end
+        T_l = Te_w_l * [rot_left,  pos_left;  0,0,0,1];
         
         pos_rel_r = [data.(robot_cols(right).x)(idx); data.(robot_cols(right).y)(idx); data.(robot_cols(right).z)(idx)];
         pos_right = Te_r(1:3,4) + pos_rel_r;
@@ -479,6 +522,7 @@ function [q_left_all, q_right_all, keyframe_indices] = load_motion_data_simple(m
         else
             rot_right = Te_r(1:3,1:3);
         end
+        T_r = Te_w_r * [rot_right, pos_right;  0,0,0,1];
         
         parameters(1, 1);
         Hl = UR5_inverse_kinematics_cpp(pos_left, rot_left, AL, A, D);
@@ -487,12 +531,14 @@ function [q_left_all, q_right_all, keyframe_indices] = load_motion_data_simple(m
         q_left = get_closer(Hl, q_left);
         q_right = get_closer(Hr, q_right);
         
-        q_left_all(i,:) = q_left;
+        q_left_all(i,:)  = q_left;
         q_right_all(i,:) = q_right;
+        poses_left_all(i,:,:)  = T_l;
+        poses_right_all(i,:,:) = T_r;
     end
     
     [filepath, filename, ~] = fileparts(motion_file);
-    keyframe_file = fullfile(filepath, [filename, '_keyframes.csv']);
+    keyframe_file = fullfile(filepath, ['data/', filename, '_keyframes.csv']);
     
     try
         keyframes = readtable(keyframe_file);
@@ -500,6 +546,8 @@ function [q_left_all, q_right_all, keyframe_indices] = load_motion_data_simple(m
     catch
         keyframe_indices = [];
     end
+
+    fprintf("Data loaded successfully\n")
 end
 
 function simulate_transformed_trajectory(timestamp, aug_id, q_left, q_right, keyframes, data_folder, object_paths, transformations)

@@ -51,6 +51,6 @@ clc; close all;
 % testing_script;
 % dual_robot_setup;
 % dual_robot_setup_simple
-simulate_recorded_motion;
+% simulate_recorded_motion;
 % calibrate_robot_bases
-% test_new_json_structure
+test_new_json_structure
