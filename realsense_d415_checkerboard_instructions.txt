@@ -1,0 +1,28 @@
+CHECKERBOARD CALIBRATION PATTERN - PRINTING INSTRUCTIONS
+======================================================
+
+Pattern Specifications:
+  - Pattern size: 8x10 squares
+  - Square size: 35 mm (3.5 cm)
+  - Total dimensions: 350x280 mm (35.0x28.0 cm)
+  - Inner corners for detection: 7x9
+
+Printing Instructions:
+  1. Print at 100% scale (no scaling)
+  2. Use a laser printer for best contrast
+  3. Print on matte paper to reduce reflections
+  4. Mount on rigid backing (foam core or cardboard)
+  5. Verify square size with a ruler after printing
+
+Calibration Parameters for OpenCV/Python:
+  square_size = 0.035  # Square size in meters
+  pattern_size = (7, 9)  # Inner corners
+
+Calibration Parameters for MATLAB:
+  checkerboardParams.squareSize = 0.035;  %% Square size in meters
+  checkerboardParams.patternSize = [7, 9];  %% Inner corners
+
+Quality Check:
+  - Measure several squares with a caliper
+  - All squares should be exactly 35 mm
+  - Pattern should be perfectly flat when mounted

@@ -58,12 +58,9 @@ Robot 4: x4, xdot4, fx4, y4, ydot4, fy4, z4, zdot4, fz4, rx4, rx_dot4, tau_x4, r
 %}
 
 % File path
-root = '/Users/danielecarraro/Documents/GITHUB/6-axis-Manipulator-Kinematics/';
-% csv_file = 'aaa_test/test_motion.csv';
-csv_file = 'good/data/1750265649_motion_move_unbalanced.csv';
-% csv_file = 'good/data/1750264739_motion_move_balanced.csv';
-% csv_file = 'good/data/1750267605_motion_move_balanced2.csv';
-% csv_file = 'good/data/1750267013_motion_balanced_maybe.csv';
+root = '/Users/danielecarraro/Documents/VSCODE/data/';
+csv_file = 'data/test_motion.csv';
+% csv_file = 'data/1750352390_motion_unbalanced_good';
 
 % Load data with column headers
 data = readtable([root, csv_file]);
@@ -202,13 +199,13 @@ end
 
 pause();
 
-% Load keyframe indices from the same directory as the input file with _keyframe_indxs.csv suffix
+% Load keyframe indices from the same directory as the input file with _keyframes.csv suffix
 [filepath, filename, ~] = fileparts([root, csv_file]);
-keyframe_file = fullfile(filepath, [filename, '_keyframe_indxs.csv']);
+keyframe_file = fullfile(filepath, [filename, '_keyframes.csv']);
 
 try
     keyframes = readtable(keyframe_file);
-    keyframe_indices = keyframes.keyframe_idx;
+    keyframe_indices = keyframes.original_index;
     use_keyframes = true;
     fprintf('Loaded %d keyframes from %s\n', length(keyframe_indices), keyframe_file);
     
@@ -297,4 +294,8 @@ disp('Motion simulation completed using inverse kinematics.');
 % Display summary of data
 fprintf('Data summary:\n');
 fprintf('  - Total frames: %d\n', height(data));
-fprintf('  - Simulated frames: %d\n', num_frames);
+if use_keyframes
+    fprintf('  - Simulated frames: %d\n', length(keyframe_indices));
+else
+    fprintf('  - Simulated frames: %d\n', num_frames);
+end

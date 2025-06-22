@@ -17,21 +17,21 @@ y_distance = 1.27;  % meters
 % Example poses for left robot
 poses_left = [
     % Pose 1
-     0.375, -0.535, 0, 0, 3.14, 0;
+     0.375-0.015, -0.535+0.015, 0.08, 0, 3.14, 0;
     % Pose 2
-    -0.375, -0.535, 0, 0, 3.14, 0;
+    -0.375+0.015, -0.535+0.015, 0.08, 0, 3.14, 0;
     % Pose 3
-       0.0, -0.335, 0, 0, 3.14, 0
+             0.0,       -0.335, 0.08, 0, 3.14, 0
 ];
 
 % Example poses for right robot
 poses_right = [
     % Pose 1
-     0.375, 0.535, 0, 0, 3.143, 0;
+     0.375-0.015, 0.535-0.015, 0.08, 0, 3.143, 0;
     % Pose 2
-    -0.375, 0.535, 0, 0, 3.143, 0;
+    -0.375+0.015, 0.535-0.015, 0.08, 0, 3.143, 0;
     % Pose 3
-       0.0, 0.335, 0, 0, 3.143, 0
+             0.0,       0.335, 0.08, 0, 3.143, 0
 ];
 
 %% Define joint configurations for each pose
@@ -82,23 +82,41 @@ tableParams.length = tableLength;
 
 axs = create_environment(tablePosition, tableParams);
 
+for i=1:3
+    % Visualize 
+    q_l = q_left(i,:)
+    [Twl, Tl] = direct_kinematics( q_l, 1 )
+    q_r = q_right(i,:)
+    [Twr, Tr] = direct_kinematics( q_r, 2 )
+
+    config_left  = set_robot_configuration(q_l, config_left);
+    config_right = set_robot_configuration(q_r, config_right);
+
+    show(robot_left,  config_left,  "Visuals", "on", "Frames", "on", "FastUpdate", true, "PreservePlot", false, "Parent", axs);
+    show(robot_right, config_right, "Visuals", "on", "Frames", "on", "FastUpdate", true, "PreservePlot", false, "Parent", axs);
+
+    pause()
+end
+
 % Update robot base transformations with calibrated values
 Trf_0_l = T_world_base_left;
 Trf_0_r = T_world_base_right;
+p_w_b_l = T_world_base_left(1:3,4);
+p_w_b_r = T_world_base_right(1:3,4);
 
 % Set initial robot configurations
-q0_left = [pi/2, -pi/3, 2*pi/3, -pi/3, pi/2, 0];
+q0_left  = [pi/2, -pi/3, 2*pi/3, -pi/3, pi/2, 0];
 q0_right = [-pi/2, -2*pi/3, -2*pi/3, -2*pi/3, -pi/2, 0];
 
-config_left = set_robot_configuration(q0_left, config_left);
+config_left  = set_robot_configuration(q0_left, config_left);
 config_right = set_robot_configuration(q0_right, config_right);
 
 % Show robots with calibrated base transformations
-show(robot_left, config_left, "Visuals", "on", "Frames", "on", "FastUpdate", true, "PreservePlot", false, "Parent", axs);
+show(robot_left,  config_left,  "Visuals", "on", "Frames", "on", "FastUpdate", true, "PreservePlot", false, "Parent", axs);
 show(robot_right, config_right, "Visuals", "on", "Frames", "on", "FastUpdate", true, "PreservePlot", false, "Parent", axs);
 
 % Add text labels for each robot
-left_base_pos = Trf_0_l(1:3,4);
+left_base_pos  = Trf_0_l(1:3,4);
 right_base_pos = Trf_0_r(1:3,4);
 text(left_base_pos(1), left_base_pos(2), tableHeight + 0.01, 'Robot Left (Calibrated)', ...
     'Color', 'r', 'FontSize', 12, 'FontWeight', 'bold', 'HorizontalAlignment', 'center', 'Parent', axs);
@@ -110,8 +128,10 @@ triad('Parent', axs, 'Matrix', eye(4), 'Scale', 0.2, 'LineWidth', 2);
 text(0, 0, 0.05, 'World Frame', 'FontSize', 10, 'FontWeight', 'bold', 'Parent', axs);
 
 % Plot robot base coordinate frames
-triad('Parent', axs, 'Matrix', T_world_base_left, 'Scale', 0.15, 'LineWidth', 2);
+triad('Parent', axs, 'Matrix', T_world_base_left,  'Scale', 0.15, 'LineWidth', 2);
+text(p_w_b_l(1), p_w_b_l(2), p_w_b_l(3)+0.05, 'T_w_b_L', 'FontSize', 10, 'FontWeight', 'bold', 'Parent', axs);
 triad('Parent', axs, 'Matrix', T_world_base_right, 'Scale', 0.15, 'LineWidth', 2);
+text(p_w_b_r(1), p_w_b_r(2), p_w_b_r(3)+0.05, 'T_w_b_R', 'FontSize', 10, 'FontWeight', 'bold', 'Parent', axs);
 
 % Set view angle
 view(45, 30);

@@ -1,4 +1,4 @@
-function T = direct_kinematics_wrapper(q, AL, A, D, TH)
+function T = direct_kinematics_wrapper(q, AL, A, D, TH, robot_id)
 % DIRECT_KINEMATICS_WRAPPER Wrapper for direct_kinematics_cpp function
 %
 % This function provides a fallback implementation of the direct kinematics
@@ -13,19 +13,13 @@ function T = direct_kinematics_wrapper(q, AL, A, D, TH)
 %
 % Output:
 %   T - 4x4 homogeneous transformation matrix from base to end-effector
-
-    % Try to use the MEX function if available
-    try
-        T = direct_kinematics_cpp(q, AL, A, D, TH);
-        return;
-    catch
-        % If MEX function is not available, use MATLAB implementation
-        fprintf('MEX function direct_kinematics_cpp not available, using MATLAB implementation.\n');
-    end
     
     % MATLAB implementation of direct kinematics using DH parameters
     % Initialize transformation matrix
     T = eye(4);
+    if robot_id == 1
+        T = eul2tform([0, 0, pi], "XYZ") * T;
+    end
     
     % Number of joints
     n = length(q);

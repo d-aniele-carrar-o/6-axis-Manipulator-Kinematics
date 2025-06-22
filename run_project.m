@@ -18,11 +18,13 @@ else
 end
 
 % Add subfolders
+data_folder = '/Users/danielecarraro/Documents/VSCODE/data/';
+addpath(fullfile(data_folder, 'data'));
+addpath(fullfile(data_folder, 'output'));
+addpath(fullfile(data_folder, 'output', 'pointcloud'));
+addpath(fullfile(data_folder, 'output', 'segmented_objects'));
+addpath(fullfile(data_folder, 'output', 'augmented_demos'));
 addpath(fullfile(project_root, 'src'));
-addpath(fullfile(project_root, 'data'));
-addpath(fullfile(project_root, 'output'));
-addpath(fullfile(project_root, 'output/pointcloud'));
-addpath(fullfile(project_root, 'output/segmented_objects'));
 addpath(fullfile(project_root, 'src', 'utils'));
 addpath(fullfile(project_root, 'src', 'plot_utils'));
 addpath(fullfile(project_root, 'src', '3_link_manipulators'));
@@ -48,5 +50,7 @@ clc; close all;
 % compile_cpp_code
 % testing_script;
 % dual_robot_setup;
+% dual_robot_setup_simple
 simulate_recorded_motion;
 % calibrate_robot_bases
+% test_new_json_structure

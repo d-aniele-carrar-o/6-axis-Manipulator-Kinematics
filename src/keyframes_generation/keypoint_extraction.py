@@ -519,25 +519,28 @@ def main(filepath=None, params=None):
             else:
                 print(f"  - {method}: 0 (disabled)")
     
-    # Save indices and methods to a CSV file in the same directory as the original file
+    # Create keyframes CSV with complete rows from original data
     original_dir = os.path.dirname(filepath)
     original_filename = os.path.basename(filepath)
-    output_filename = os.path.splitext(original_filename)[0] + "_keyframe_indxs.csv"
+    output_filename = os.path.splitext(original_filename)[0] + "_keyframes.csv"
     output_kf_filepath = os.path.join(original_dir, output_filename)
     
-    # Save as DataFrame for better formatting
-    kf_df = pd.DataFrame({
-        'keyframe_idx': keyframe_indices,
-        'extraction_method': final_methods
-    })
-    kf_df.to_csv(output_kf_filepath, index=False)
-    print(f"\nKeyframe indices and methods saved to {output_kf_filepath}")
+    # Read the original CSV to get complete rows
+    orig_df = pd.read_csv(filepath, skipinitialspace=True)
     
-    # Method 2: Add a keyframe column to the original CSV
+    # Extract keyframe rows from original data
+    keyframe_rows = orig_df.iloc[keyframe_indices].copy()
+    
+    # Add original index and extraction method columns
+    keyframe_rows['original_index'] = keyframe_indices
+    keyframe_rows['extraction_method'] = final_methods
+    
+    # Save complete keyframe data
+    keyframe_rows.to_csv(output_kf_filepath, index=False)
+    print(f"\nComplete keyframe data saved to {output_kf_filepath}")
+    
+    # Optional: Add a keyframe column to the original CSV
     try:
-        # Read the original CSV
-        orig_df = pd.read_csv(filepath, skipinitialspace=True)
-        
         # Create a new column with 0s (not a keyframe)
         orig_df['is_keyframe'] = 0
         

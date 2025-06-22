@@ -41,18 +41,21 @@ function [T_world_base_left, T_world_base_right] = compute_robot_base_transforms
     % Compute forward kinematics for each pose
     for i = 1:num_poses
         % Compute end-effector pose in base frame using forward kinematics
-        T_base_ee_left{i} = direct_kinematics_wrapper(q_left(i,:), AL_left, A_left, D_left, TH_left);
-        T_base_ee_right{i} = direct_kinematics_wrapper(q_right(i,:), AL_right, A_right, D_right, TH_right);
+        T_base_ee_left{i}  = direct_kinematics_wrapper(q_left(i,:),  AL_left, A_left, D_left, TH_left, 1);
+        T_base_ee_right{i} = direct_kinematics_wrapper(q_right(i,:), AL_right, A_right, D_right, TH_right, 2);
         
         % Convert world poses to homogeneous transformations
         % Assuming poses are in [x,y,z,rx,ry,rz] format where rx,ry,rz are Euler angles in XYZ convention
-        pos_left = poses_left(i,1:3);
-        rot_left = poses_left(i,4:6);
-        T_world_ee_left{i} = eul2tform(rot_left, 'XYZ') * trvec2tform(pos_left);
+        pos_left = poses_left(i,1:3)
+        rot_left = poses_left(i,4:6)
+        tl =  eul2tform(rot_left, 'XYZ') * trvec2tform(pos_left)
+        T_world_ee_left{i} = tl;
         
-        pos_right = poses_right(i,1:3);
-        rot_right = poses_right(i,4:6);
-        T_world_ee_right{i} = eul2tform(rot_right, 'XYZ') * trvec2tform(pos_right);
+        pos_right = poses_right(i,1:3)
+        rot_right = poses_right(i,4:6)
+        tr =  eul2tform(rot_right, 'XYZ') * trvec2tform(pos_right)
+        T_world_ee_right{i} = tr;
+        disp("--------------------------")
     end
     
     % Solve AX=XB problem for each robot
@@ -60,12 +63,14 @@ function [T_world_base_left, T_world_base_right] = compute_robot_base_transforms
     % So T_world_base = T_world_ee * inv(T_base_ee)
     
     % Initialize transformation matrices
-    T_world_base_left_estimates = cell(num_poses, 1);
+    T_world_base_left_estimates  = cell(num_poses, 1);
     T_world_base_right_estimates = cell(num_poses, 1);
     
     for i = 1:num_poses
-        T_world_base_left_estimates{i} = T_world_ee_left{i} * inv(T_base_ee_left{i});
-        T_world_base_right_estimates{i} = T_world_ee_right{i} * inv(T_base_ee_right{i});
+        a = T_world_ee_left{i}  / T_base_ee_left{i}
+        T_world_base_left_estimates{i}  = a;
+        b = T_world_ee_right{i} / T_base_ee_right{i}
+        T_world_base_right_estimates{i} = b;
     end
     
     % Average the transformations to get a more robust estimate
@@ -84,8 +89,8 @@ function [T_world_base_left, T_world_base_right] = compute_robot_base_transforms
     end
     
     % Average translations and rotations
-    avg_trans_left = mean(trans_left, 1);
-    avg_trans_right = mean(trans_right, 1);
+    avg_trans_left = mean(trans_left, 1)
+    avg_trans_right = mean(trans_right, 1)
     avg_rot_left = mean(rot_left, 1);
     avg_rot_right = mean(rot_right, 1);
     

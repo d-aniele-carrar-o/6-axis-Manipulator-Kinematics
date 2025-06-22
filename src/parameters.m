@@ -112,13 +112,13 @@ function parameters( level, robot_id )
     end
 % okay, this is workingexclude X (camera) directns fitting for line fit
     % Set table dimensions
-    tableHeight    = 0.6;
+    tableHeight    = 0.76;
     tableWidth     = 1.5;
     tableLength    = 0.75;
     tablePosition  = [0.0, 0.0, tableHeight];
-    tableRoI       = [1.0, 0.8, 0.5];  % RoI for plane fitting in camera coords
+    tableRoI       = [0.9, 0.65, 0.4];  % RoI for plane fitting in camera coords
     standHeight    = 0.215;
-    robotsDistance = 1.27;  % Distance between robot's base origins
+    robotsDistance = 1.12;  % Distance between robot's base origins
 
     % Eventual transformation between World Reference Frame and Frame 0
     % Create a base link with the desired position and orientation
