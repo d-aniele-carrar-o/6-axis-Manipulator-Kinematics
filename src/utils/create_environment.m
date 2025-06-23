@@ -37,7 +37,9 @@ function [axs] = create_environment(tablePosition, tableParams)
     % Draw table top
     [X, Y] = meshgrid([-tableParams.length/2:0.05:tableParams.length/2], [-tableParams.width/2:0.05:tableParams.width/2]);
     Z = zeros(size(X)) + tableParams.height;  % Table is at Z=tableHeight in world frame
-    surf(X, Y, Z, 'FaceColor', [0.8 0.7 0.6], 'FaceAlpha', 0.7, 'EdgeColor', 'none'); hold on;
+    tableSurf = surf(X, Y, Z, 'FaceColor', [0.8 0.7 0.6], 'EdgeColor', 'none');
+    set(tableSurf, 'AmbientStrength', 0.8, 'DiffuseStrength', 0.6, 'SpecularStrength', 0.1);
+    hold on;
 
     % Draw table legs
     legRadius = 0.05;

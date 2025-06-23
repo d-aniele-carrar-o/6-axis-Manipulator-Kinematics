@@ -24,7 +24,7 @@ catch ME
     fprintf('%s\n', ME.message);
     
     % Try to provide helpful debugging info
-    augmented_demos_path = '/Users/danielecarraro/Documents/VSCODE/data/output/augmented_demos';
+    parameters(1);
     json_file = fullfile(augmented_demos_path, timestamp, sprintf('augmented_demos_%s.json', timestamp));
     
     if ~exist(json_file, 'file')

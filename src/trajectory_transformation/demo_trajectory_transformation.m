@@ -1,9 +1,6 @@
 % Comprehensive demo of trajectory transformation capabilities
 clear; clc; close all;
 
-% Setup
-run_project;
-
 fprintf('=== Trajectory Transformation Demo ===\n\n');
 
 % Parameters
@@ -83,13 +80,13 @@ function analyze_transformation_quality(timestamp, aug_ids)
         aug_id = aug_ids(i);
         
         % Load augmentation data
-        augmented_demos_path = '/Users/danielecarraro/Documents/VSCODE/data/output/augmented_demos';
+        parameters(1);
         json_file = fullfile(augmented_demos_path, timestamp, 'augmented_demos.json');
         augmentation_data = jsondecode(fileread(json_file));
         aug_scene = augmentation_data.augmentations(aug_id + 1); % +1 for MATLAB indexing
         
         % Load original objects from paths
-        data_folder = '/Users/danielecarraro/Documents/VSCODE/data/';
+        parameters(1);
         object_paths = augmentation_data.original_objects.paths;
         original_objects = cell(length(object_paths), 1);
         for j = 1:length(object_paths)
@@ -224,53 +221,3 @@ function [q_left_all, q_right_all, keyframe_indices] = load_motion_data_simple(m
     end
 end
 
-function motion_file = find_closest_motion_file(target_timestamp)
-    data_folder = '/Users/danielecarraro/Documents/VSCODE/data/';
-    files = dir(fullfile(data_folder, '**', '*_motion*'));
-    
-    if isempty(files)
-        motion_file = '';
-        return;
-    end
-    
-    target_time = parse_timestamp(target_timestamp);
-    if isnan(target_time)
-        motion_file = '';
-        return;
-    end
-    
-    best_diff = inf;
-    motion_file = '';
-    for i = 1:length(files)
-        file_timestamp = extract_timestamp_from_filename(files(i).name);
-        if ~isempty(file_timestamp)
-            file_time = parse_timestamp(file_timestamp);
-            if ~isnan(file_time)
-                diff = abs(file_time - target_time);
-                if diff < best_diff
-                    best_diff = diff;
-                    motion_file = fullfile(files(i).folder, files(i).name);
-                end
-            end
-        end
-    end
-end
-
-function timestamp_str = extract_timestamp_from_filename(filename)
-    pattern = '\d{2}-\d{2}-\d{2}-\d{2}-\d{2}';
-    match = regexp(filename, pattern, 'match');
-    if ~isempty(match)
-        timestamp_str = [match{1}, '-00'];
-    else
-        timestamp_str = '';
-    end
-end
-
-function time_val = parse_timestamp(timestamp_str)
-    try
-        dt = datetime(timestamp_str, 'InputFormat', 'yy-MM-dd-HH-mm-ss');
-        time_val = posixtime(dt);
-    catch
-        time_val = NaN;
-    end
-end

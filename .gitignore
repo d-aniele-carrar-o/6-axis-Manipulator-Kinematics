@@ -1,5 +1,6 @@
 src/mex_compiled_functions/*
 .vscode
+.amazonq
 src/.vscode
 .DS_Store
 src/.DS_Store
@@ -9,3 +10,4 @@ src/.DS_Store
 *.csv
 *.json
 *.mp4
+*.pdf

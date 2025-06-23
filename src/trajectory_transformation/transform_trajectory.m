@@ -10,7 +10,7 @@ if nargin < 2
 end
 
 % Load augmentation data
-augmented_demos_path = '/Users/danielecarraro/Documents/VSCODE/data/output/augmented_demos';
+parameters(1);
 json_file = fullfile(augmented_demos_path, timestamp, 'augmented_demos.json');
 
 if ~exist(json_file, 'file')
@@ -52,7 +52,7 @@ if abs(table_z_median - 0.78) > 0.1  % Assuming table height ~0.78m
 end
 
 % Load original objects from paths
-data_folder = '/Users/danielecarraro/Documents/VSCODE/data/';
+parameters(1);
 object_paths = augmentation_data.original_objects.paths;
 ptCloudObject = pcread(fullfile(data_folder, object_paths{1}));
 object_center = mean(ptCloudObject.Location, 1);
@@ -170,15 +170,14 @@ function visualize_transformed_trajectory(timestamp, aug_id, ...
     title('Original Trajectory');
     
     % Environment
-    tableParams.height = 0.78; tableParams.width = 1.2; tableParams.length = 0.8;
     create_environment([0, 0, 0], tableParams);
     
     % Original object
     scatter3(orig_center(1), orig_center(2), orig_center(3), 200, 'ro', 'filled');
     
     % Robot trajectories
-    plot_robot_trajectory(robot_left, config_left, q_left_orig, keyframe_indices, 'b-');
-    plot_robot_trajectory(robot_right, config_right, q_right_orig, keyframe_indices, 'r-');
+    plot_robot_trajectory(q_left_orig,  keyframe_indices, 'b-', true, step, 1);
+    plot_robot_trajectory(q_right_orig, keyframe_indices, 'r-', true, step, 2);
     
     % Transformed trajectory
     subplot(1, 2, 2);
@@ -210,194 +209,4 @@ function visualize_transformed_trajectory(timestamp, aug_id, ...
     
     fprintf('Visualization complete. Original center: [%.3f, %.3f, %.3f], New center: [%.3f, %.3f, %.3f]\n', ...
         orig_center, new_center);
-end
-
-function plot_robot_trajectory(robot, config, q_trajectory, keyframe_indices, line_style)
-% Plot robot end-effector trajectory
-    
-    ee_positions = zeros(size(q_trajectory, 1), 3);
-    
-    for i = 1:size(q_trajectory, 1)
-        config = set_robot_configuration(q_trajectory(i,:), config);
-        T = getTransform(robot, config, 'wrist_3_link');
-        ee_positions(i, :) = T(1:3, 4)';
-    end
-    
-    % Plot trajectory
-    plot3(ee_positions(:,1), ee_positions(:,2), ee_positions(:,3), line_style, 'LineWidth', 2);
-    
-    % Highlight keyframes if available
-    if ~isempty(keyframe_indices)
-        step = 50; % Assuming downsampling factor
-        for i = 1:length(keyframe_indices)
-            idx = min(floor(keyframe_indices(i) / step) + 1, size(ee_positions, 1));
-            scatter3(ee_positions(idx,1), ee_positions(idx,2), ee_positions(idx,3), ...
-                100, 'k*', 'LineWidth', 2);
-        end
-    end
-end
-
-function [q_left_all, q_right_all, keyframe_indices] = load_motion_data_simple(motion_file)
-% Simplified motion data loading
-    
-    data = readtable(motion_file);
-    
-    % Robot mappings
-    left = 4; right = 2;
-    
-    % Create column mappings
-    robot_cols = struct();
-    for i = 1:4
-        robot_cols(i).x = sprintf('x%d', i);
-        robot_cols(i).y = sprintf('y%d', i);
-        robot_cols(i).z = sprintf('z%d', i);
-        robot_cols(i).rx = sprintf('rx%d', i);
-        robot_cols(i).ry = sprintf('ry%d', i);
-        robot_cols(i).rz = sprintf('rz%d', i);
-    end
-    
-    % Downsample data
-    step = 50;
-    num_frames = floor(height(data)/step);
-    
-    q_left_all = zeros(num_frames, 6);
-    q_right_all = zeros(num_frames, 6);
-    
-    % Initial configurations
-    q0_left  = [pi/2, -pi/3, 2*pi/3, -pi/3, pi/2, 0];
-    q0_right = [-pi/2, -2*pi/3, -2*pi/3, -2*pi/3, -pi/2, 0];
-    
-    q_left = q0_left;
-    q_right = q0_right;
-    
-    % Get initial end-effector poses
-    parameters(1, 1); [~, Te_l] = direct_kinematics(q0_left, 1);
-    parameters(1, 2); [~, Te_r] = direct_kinematics(q0_right, 2);
-    
-    % Compute joint configurations
-    for i = 2:num_frames
-        idx = (i-1)*step + 1;
-        
-        % Left robot
-        pos_rel_l = [data.(robot_cols(left).x)(idx); data.(robot_cols(left).y)(idx); data.(robot_cols(left).z)(idx)];
-        pos_left = Te_l(1:3,4) + pos_rel_l;
-        left_vec = [data.(robot_cols(left).rx)(idx), -data.(robot_cols(left).rz)(idx), data.(robot_cols(left).ry)(idx)];
-        left_angle = norm(left_vec);
-        if left_angle > 0
-            rot_left = Te_l(1:3,1:3) * axang2rotm([left_vec/left_angle, left_angle]);
-        else
-            rot_left = Te_l(1:3,1:3);
-        end
-        
-        % Right robot
-        pos_rel_r = [data.(robot_cols(right).x)(idx); data.(robot_cols(right).y)(idx); data.(robot_cols(right).z)(idx)];
-        pos_right = Te_r(1:3,4) + pos_rel_r;
-        right_vec = [data.(robot_cols(right).rx)(idx), data.(robot_cols(right).rz)(idx), -data.(robot_cols(right).ry)(idx)];
-        right_angle = norm(right_vec);
-        if right_angle > 0
-            rot_right = Te_r(1:3,1:3) * axang2rotm([right_vec/right_angle, right_angle]);
-        else
-            rot_right = Te_r(1:3,1:3);
-        end
-        
-        % Inverse kinematics
-        parameters(1, 1);
-        Hl = UR5_inverse_kinematics_cpp(pos_left, rot_left, AL, A, D);
-        parameters(1, 2);
-        Hr = UR5_inverse_kinematics_cpp(pos_right, rot_right, AL, A, D);
-        q_left = get_closer(Hl, q_left);
-        q_right = get_closer(Hr, q_right);
-        
-        q_left_all(i,:) = q_left;
-        q_right_all(i,:) = q_right;
-    end
-    
-    % Load keyframes if available
-    [filepath, filename, ~] = fileparts(motion_file);
-    keyframe_file = fullfile(filepath, [filename, '_keyframes.csv']);
-    
-    try
-        keyframes = readtable(keyframe_file);
-        keyframe_indices = keyframes.original_index;
-        fprintf('Loaded %d keyframes\n', length(keyframe_indices));
-    catch
-        keyframe_indices = [];
-        fprintf('No keyframes found\n');
-    end
-end
-
-% Helper functions from dual_robot_setup_simple.m
-function motion_file = find_closest_motion_file(target_timestamp)
-    data_folder = '/Users/danielecarraro/Documents/VSCODE/data/';
-    files = dir(fullfile(data_folder, '**', '*_motion*'));
-    
-    if isempty(files)
-        motion_file = '';
-        return;
-    end
-    
-    target_time = parse_timestamp(target_timestamp);
-    if isnan(target_time)
-        motion_file = '';
-        return;
-    end
-    
-    best_diff = inf;
-    motion_file = '';
-    for i = 1:length(files)
-        file_timestamp = extract_timestamp_from_filename(files(i).name);
-        if ~isempty(file_timestamp)
-            file_time = parse_timestamp(file_timestamp);
-            if ~isnan(file_time)
-                diff = abs(file_time - target_time);
-                if diff < best_diff
-                    best_diff = diff;
-                    motion_file = fullfile(files(i).folder, files(i).name);
-                end
-            end
-        end
-    end
-end
-
-function timestamp_str = extract_timestamp_from_filename(filename)
-    pattern = '\d{2}-\d{2}-\d{2}-\d{2}-\d{2}';
-    match = regexp(filename, pattern, 'match');
-    if ~isempty(match)
-        timestamp_str = [match{1}, '-00'];
-    else
-        timestamp_str = '';
-    end
-end
-
-function time_val = parse_timestamp(timestamp_str)
-    try
-        dt = datetime(timestamp_str, 'InputFormat', 'yy-MM-dd-HH-mm-ss');
-        time_val = posixtime(dt);
-    catch
-        time_val = NaN;
-    end
-end
-
-function [scenePath, objectPath] = find_pointcloud_files(timestamp)
-    data_folder = '/Users/danielecarraro/Documents/VSCODE/data/';
-    
-    scene_files = dir(fullfile(data_folder, '**', '*table*.ply'));
-    object_files = dir(fullfile(data_folder, '**', '*object*.ply'));
-    
-    scenePath = '';
-    objectPath = '';
-    
-    for i = 1:length(scene_files)
-        if contains(scene_files(i).name, timestamp) || contains(scene_files(i).folder, timestamp)
-            scenePath = fullfile(scene_files(i).folder, scene_files(i).name);
-            break;
-        end
-    end
-    
-    for i = 1:length(object_files)
-        if contains(object_files(i).name, timestamp) || contains(object_files(i).folder, timestamp)
-            objectPath = fullfile(object_files(i).folder, object_files(i).name);
-            break;
-        end
-    end
 end

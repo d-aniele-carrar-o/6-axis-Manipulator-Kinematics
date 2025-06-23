@@ -47,7 +47,7 @@ function parameters( level, robot_id )
     % Manipulator in use for which compute kinematics for
     manipulator = robot_types(robot_id);
 
-    % Use robot's urdf for visualization (if dual robot setup)
+    % Use robot's urdf for visualization
     real_robot = true;
 
     % Gripper presence depends on robot type
@@ -110,19 +110,23 @@ function parameters( level, robot_id )
         exit
     
     end
-% okay, this is workingexclude X (camera) directns fitting for line fit
+
+
+    % Define useful parameters for evnvironment simulation ========================================
     % Set table dimensions
     tableHeight    = 0.76;
     tableWidth     = 1.5;
     tableLength    = 0.75;
+    tableParams.height = tableHeight;
+    tableParams.width  = tableWidth;
+    tableParams.length = tableLength;
+
     tablePosition  = [0.0, 0.0, tableHeight];
     tableRoI       = [0.9, 0.65, 0.4];  % RoI for plane fitting in camera coords
     standHeight    = 0.215;
     robotsDistance = 1.12;  % Distance between robot's base origins
 
-    % Eventual transformation between World Reference Frame and Frame 0
-    % Create a base link with the desired position and orientation
-    % (on top and in the center of the table)
+    % Transformation between World Reference Frame and Robot's Base Frame
     basePosition    = tablePosition;  % Position in [x, y, z]
     baseOrientation = [0, 0, 0];      % Orientation in [roll, pitch, yaw]
     
@@ -144,6 +148,12 @@ function parameters( level, robot_id )
         [robot, config] = get_robot( manipulator, Trf_0 );
     end
 
+
+    % Useful folders ==============================================================================
+    data_folder = '/Users/danielecarraro/Documents/VSCODE/data/';
+    augmented_demos_path = [data_folder, 'output/augmented_demos'];
+
+
     % Export variables to workspace ===============================================================
     varnames = who;
     for i = 1:length(varnames)
@@ -151,4 +161,3 @@ function parameters( level, robot_id )
     end
 
 end
-
