@@ -303,9 +303,15 @@ function visualize_advanced_transformation(timestamp, aug_id, ...
             150, colors(i,:), 'o', 'filled');
     end
     
+    % Get keyframe names from interaction points if available
+    keyframe_names = {};
+    if ~isempty(interaction_points) && isfield(interaction_points, 'keyframes')
+        keyframe_names = cellstr(interaction_points.keyframes.extraction_method);
+    end
+    
     % Robot trajectories
-    plot_robot_trajectory_advanced(robot_left, config_left, q_left_orig, keyframe_indices, 'b-');
-    plot_robot_trajectory_advanced(robot_right, config_right, q_right_orig, keyframe_indices, 'r-');
+    plot_robot_trajectory_advanced(robot_left, config_left, q_left_orig, keyframe_indices, 'b-', keyframe_names);
+    plot_robot_trajectory_advanced(robot_right, config_right, q_right_orig, keyframe_indices, 'r-', keyframe_names);
     
     % Highlight interaction points
     ee_left = get_end_effector_trajectory(q_left_orig, 1);
@@ -347,8 +353,8 @@ function visualize_advanced_transformation(timestamp, aug_id, ...
     end
     
     % Robot trajectories
-    plot_robot_trajectory_advanced(robot_left, config_left, q_left_new, keyframe_indices, 'b-');
-    plot_robot_trajectory_advanced(robot_right, config_right, q_right_new, keyframe_indices, 'r-');
+    plot_robot_trajectory_advanced(robot_left, config_left, q_left_new, keyframe_indices, 'b-', keyframe_names);
+    plot_robot_trajectory_advanced(robot_right, config_right, q_right_new, keyframe_indices, 'r-', keyframe_names);
     
     % Set consistent view
     for i = 1:2
@@ -374,15 +380,20 @@ function save_transformed_trajectory(timestamp, aug_id, q_left, q_right, keyfram
     fprintf('Transformed trajectory saved to: %s\n', filepath);
 end
 
-function plot_robot_trajectory_advanced(robot, config, q_trajectory, keyframe_indices, line_style)
-% Plot robot end-effector trajectory
+function plot_robot_trajectory_advanced(robot, config, q_trajectory, keyframe_indices, line_style, keyframe_names)
+% Plot robot end-effector trajectory with enhanced keyframe visualization
+    
+    % Default parameters
+    if nargin < 6, keyframe_names = {}; end
     
     ee_positions = zeros(size(q_trajectory, 1), 3);
+    ee_rotations = zeros(size(q_trajectory, 1), 3, 3);
     
     for i = 1:size(q_trajectory, 1)
         config = set_robot_configuration(q_trajectory(i,:), config);
         T = getTransform(robot, config, 'wrist_3_link');
         ee_positions(i, :) = T(1:3, 4)';
+        ee_rotations(i, :, :) = T(1:3, 1:3);
     end
     
     % Plot trajectory
@@ -393,8 +404,31 @@ function plot_robot_trajectory_advanced(robot, config, q_trajectory, keyframe_in
         step = 50; % Assuming downsampling factor
         for i = 1:length(keyframe_indices)
             idx = min(floor(keyframe_indices(i) / step) + 1, size(ee_positions, 1));
-            scatter3(ee_positions(idx,1), ee_positions(idx,2), ee_positions(idx,3), ...
-                100, 'k*', 'LineWidth', 2);
+            
+            % Get position
+            pos = ee_positions(idx,:)';
+            
+            % Add marker
+            scatter3(pos(1), pos(2), pos(3), 100, 'k*', 'LineWidth', 2);
+            
+            % Add text label with background
+            color = line_style(1); % Use first character of line_style as color
+            if ~isempty(keyframe_names) && i <= length(keyframe_names)
+                label_text = keyframe_names{i};
+            else
+                % Use extraction method if available in interaction_points
+                if exist('interaction_points', 'var') && isfield(interaction_points, 'keyframes') && i <= height(interaction_points.keyframes)
+                    label_text = char(interaction_points.keyframes.extraction_method(i));
+                else
+                    label_text = sprintf('KF %d', i);
+                end
+            end
+            
+            % Create text with white background and colored border
+            text(pos(1), pos(2), pos(3) + 0.08, label_text, ...
+                'Color', color, 'FontSize', 10, 'FontWeight', 'bold', ...
+                'HorizontalAlignment', 'center', 'BackgroundColor', 'white', ...
+                'EdgeColor', color, 'Margin', 2);
         end
     end
 end
@@ -559,6 +593,32 @@ function simulate_transformed_trajectory(timestamp, aug_id, q_left, q_right, key
         parameters(1, 2); [Te_right_new, ~] = direct_kinematics(q_right(i,:), 2);
         plotTransforms(Te_left_new(1:3,4)', rotm2quat(Te_left_new(1:3,1:3)), 'FrameSize', 0.05, 'FrameColor', 'b', 'Parent', gca);
         plotTransforms(Te_right_new(1:3,4)', rotm2quat(Te_right_new(1:3,1:3)), 'FrameSize', 0.05, 'FrameColor', 'r', 'Parent', gca);
+        
+        % Add keyframe labels if this is a keyframe
+        if ~isempty(keyframes)
+            step = 50;
+            for k = 1:length(keyframes)
+                kf_idx = min(floor(keyframes(k) / step) + 1, size(q_left, 1));
+                if abs(i - kf_idx) < 3  % If we're close to a keyframe
+                    % Get keyframe name if available
+                    if exist('interaction_points', 'var') && isfield(interaction_points, 'keyframes') && k <= height(interaction_points.keyframes)
+                        kf_name = char(interaction_points.keyframes.extraction_method(k));
+                    else
+                        kf_name = sprintf('KF %d', k);
+                    end
+                    
+                    % Add labels at both robot end-effectors
+                    text(Te_left_new(1,4), Te_left_new(2,4), Te_left_new(3,4) + 0.08, kf_name, ...
+                        'Color', 'b', 'FontSize', 10, 'FontWeight', 'bold', ...
+                        'HorizontalAlignment', 'center', 'BackgroundColor', 'white', ...
+                        'EdgeColor', 'b', 'Margin', 2);
+                    text(Te_right_new(1,4), Te_right_new(2,4), Te_right_new(3,4) + 0.08, kf_name, ...
+                        'Color', 'r', 'FontSize', 10, 'FontWeight', 'bold', ...
+                        'HorizontalAlignment', 'center', 'BackgroundColor', 'white', ...
+                        'EdgeColor', 'r', 'Margin', 2);
+                end
+            end
+        end
         
         title(sprintf('Transformed Trajectory Simulation - Frame %d/%d', i, size(q_left, 1)));
         pause(0.05);

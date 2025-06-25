@@ -48,12 +48,8 @@ PROJECT_ROOT = project_root;
 
 clc; close all;
 
-% Run the testing script
+% Run the desired script ------------------------------------------------------
 % compile_cpp_code
 % testing_script;
-% dual_robot_setup;
 % dual_robot_setup_simple
-% simulate_recorded_motion;
-% calibrate_robot_bases
-% test_new_json_structure
-plot_recorded_motion
+% simulate_recorded_motion

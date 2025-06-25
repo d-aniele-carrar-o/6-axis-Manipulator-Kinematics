@@ -1,9 +1,10 @@
-function plot_robot_trajectory(q_trajectory, keyframe_indices, line_style, world_rf, step, robot_id, axs, display_name, use_triad)
+function [traj_handle] = plot_robot_trajectory(q_trajectory, keyframe_indices, keyframe_names, line_style, world_rf, step, robot_id, axs, display_name, use_triad)
 % Plot robot end-effector trajectory and keyframes
 %
 % Parameters:
 %   q_trajectory     - Joint configurations [Nx6]
 %   keyframe_indices - Indices of keyframes in original data
+%   keyframe_names   - Cell array of keyframe names (optional)
 %   line_style       - Line style for trajectory (e.g., 'r-')
 %   world_rf         - Boolean, true to use world reference frame
 %   step             - Downsampling step used when creating q_trajectory
@@ -13,12 +14,13 @@ function plot_robot_trajectory(q_trajectory, keyframe_indices, line_style, world
 %   use_triad        - Boolean, true to use triad for keyframe visualization
     
     % Default parameters
-    if nargin < 9, use_triad = false; end
-    if nargin < 8, display_name = []; end
-    if nargin < 7, axs = gca; end
-    if nargin < 6, robot_id = 1; end
-    if nargin < 5, step = 1; end
-    if nargin < 4, world_rf = true; end
+    if nargin < 10, use_triad = false; end
+    if nargin < 9, display_name = []; end
+    if nargin < 8, axs = gca; end
+    if nargin < 7, robot_id = 1; end
+    if nargin < 6, step = 1; end
+    if nargin < 5, world_rf = true; end
+    if nargin < 4, line_style = 'r-'; end
 
     % Preallocate trajectory array
     ee_positions = zeros(size(q_trajectory, 1), 3);
@@ -39,9 +41,9 @@ function plot_robot_trajectory(q_trajectory, keyframe_indices, line_style, world
     
     % Plot trajectory
     if isempty(display_name)
-        h = plot3(ee_positions(:,1), ee_positions(:,2), ee_positions(:,3), line_style, 'LineWidth', 2, 'Parent', axs);
+        traj_handle = plot3(ee_positions(:,1), ee_positions(:,2), ee_positions(:,3), line_style, 'LineWidth', 2, 'Parent', axs);
     else
-        h = plot3(ee_positions(:,1), ee_positions(:,2), ee_positions(:,3), line_style, 'LineWidth', 2, 'DisplayName', display_name, 'Parent', axs);
+        traj_handle = plot3(ee_positions(:,1), ee_positions(:,2), ee_positions(:,3), line_style, 'LineWidth', 2, 'DisplayName', display_name, 'Parent', axs);
     end
     
     % Highlight keyframes if available
@@ -62,15 +64,34 @@ function plot_robot_trajectory(q_trajectory, keyframe_indices, line_style, world
                 % Use triad for coordinate frame visualization
                 triad('Parent', axs, 'Scale', 0.05, 'LineWidth', 2, 'Matrix', T, ...
                       'Tag', sprintf('Keyframe %d Robot %d', i, robot_id));
-                
-                % Add text label
-                color = line_style(1); % Use first character of line_style as color
-                text(pos(1), pos(2), pos(3) + 0.05, sprintf('KF %d', i), ...
-                    'Color', color, 'FontSize', 10, 'FontWeight', 'bold', 'Parent', axs);
             else
                 % Simple marker
                 scatter3(pos(1), pos(2), pos(3), 100, 'k*', 'LineWidth', 2, 'Parent', axs);
             end
+            
+            % Add text label with background
+            color = line_style(1); % Use first character of line_style as color
+            if ~isempty(keyframe_names)
+                if iscell(keyframe_names) && i <= length(keyframe_names)
+                    label_text = keyframe_names{i};
+                elseif istable(keyframe_names) || isstring(keyframe_names)
+                    if i <= length(keyframe_names)
+                        label_text = char(keyframe_names(i));
+                    else
+                        label_text = sprintf('KF %d', i);
+                    end
+                else
+                    label_text = sprintf('KF %d', i);
+                end
+            else
+                label_text = sprintf('KF %d', i);
+            end
+            
+            % Create text with white background and colored border
+            text(pos(1), pos(2), pos(3) + 0.08, label_text, ...
+                'Color', color, 'FontSize', 10, 'FontWeight', 'bold', 'Parent', axs, ...
+                'HorizontalAlignment', 'center', 'BackgroundColor', 'white', ...
+                'EdgeColor', color, 'Margin', 2);
         end
     end
 end

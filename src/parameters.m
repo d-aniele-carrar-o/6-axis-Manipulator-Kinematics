@@ -151,6 +151,7 @@ function parameters( level, robot_id )
 
     % Useful folders ==============================================================================
     data_folder = '/Users/danielecarraro/Documents/VSCODE/data/';
+    motion_data_folder   = [data_folder, 'data/'];
     augmented_demos_path = [data_folder, 'output/augmented_demos'];
 
 
