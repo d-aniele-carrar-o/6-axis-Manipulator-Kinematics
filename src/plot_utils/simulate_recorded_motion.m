@@ -14,12 +14,8 @@ Trf_0_r = Trf_0;
 
 % Create environment
 figure('Name', '3D Robot Trajectory Visualization', 'Position', [100, 100, 1200, 800]);
-hold on; grid on;
-
-tableParams.height = tableHeight;
-tableParams.width  = tableWidth;
-tableParams.length = tableLength;
-axs = create_environment(tablePosition, tableParams);
+hold on; grid on; axis equal;
+axs = create_environment();
 
 % File path
 % Example timestamp format: '25-06-24-21-30-34'
@@ -75,11 +71,11 @@ q0_right = [-pi/2, -2*pi/3, -2*pi/3, -2*pi/3, -pi/2, 0];
 
 % Read and compute trajectories in world coordinates
 step = 50; % Downsample for trajectory simulation
-[q_l_all, q_r_all, poses_l_all, poses_r_all, use_keyframes, keyframe_indices, keyframe_names] = load_motion_data(motion_file, q0_left, q0_right, step);
+[q_l_all, q_r_all, poses_l_all, poses_r_all, keyframes_data] = load_motion_data(motion_file, q0_left, q0_right, step);
 
 % Plot trajectories and get handles for simulation
-traj_left_handle  = plot_robot_trajectory(q_l_all, keyframe_indices, keyframe_names, 'r-', true, step, 1, axs, 'Left Robot Trajectory',  false);
-traj_right_handle = plot_robot_trajectory(q_r_all, keyframe_indices, keyframe_names, 'b-', true, step, 2, axs, 'Right Robot Trajectory', false);
+traj_left_handle  = plot_robot_trajectory(q_l_all, keyframes_data, 1, axs, 'r-', true, true);
+traj_right_handle = plot_robot_trajectory(q_r_all, keyframes_data, 2, axs, 'b-', true, true);
 
 % Show initial robot configurations
 config_left  = set_robot_configuration(q0_left,  config_left);
@@ -106,7 +102,6 @@ axis equal;
 fprintf('Starting trajectory simulation, press a key to continue...\n');
 pause()
 simulate_robot_trajectories(robot_left, robot_right, config_left, config_right, ...
-                            q_l_all, q_r_all, keyframe_indices, keyframe_names, step, axs, ...
-                            traj_left_handle, traj_right_handle);
+                            q_l_all, q_r_all, keyframes_data, axs, traj_left_handle, traj_right_handle);
 
 fprintf('3D trajectory visualization completed\n');

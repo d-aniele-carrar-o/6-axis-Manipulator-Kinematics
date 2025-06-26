@@ -1,11 +1,7 @@
 function simulate_robot_trajectories(robot_left, robot_right, config_left, config_right, ...
-                                     q_l_all, q_r_all, keyframe_indices, keyframe_names, step, axs, ...
+                                     q_l_all, q_r_all, keyframes_data, axs, ...
                                      traj_left_handle, traj_right_handle)
     % Simulate robot trajectories with keyframe stops and greying executed paths
-    
-    % Get keyframe indices for downsampled data
-    kf_indices_downsampled = floor(keyframe_indices / step) + 1;
-    kf_indices_downsampled = min(kf_indices_downsampled, size(q_l_all, 1));
     
     % Animation parameters
     pause_time = 0.05; % Seconds between frames
@@ -27,6 +23,7 @@ function simulate_robot_trajectories(robot_left, robot_right, config_left, confi
     
     fprintf('Animating %d trajectory points...\n', size(q_l_all, 1));
     
+    kf_idx = 1;
     for i = 1:size(q_l_all, 1)
         % Update robot configurations
         config_left  = set_robot_configuration(q_l_all(i,:), config_left);
@@ -73,15 +70,10 @@ function simulate_robot_trajectories(robot_left, robot_right, config_left, confi
         end
         
         % Check if current index is a keyframe
-        if any(kf_indices_downsampled == i)
-            kf_num = find(kf_indices_downsampled == i);
-            if ~isempty(keyframe_names) && all(iscell(keyframe_names)) && all(kf_num <= length(keyframe_names))
-                kf_name = keyframe_names{kf_num};
-                fprintf('Reached keyframe %d (%s) - pausing, press a key to continue...\n', kf_num, kf_name);
-            else
-                fprintf('Reached keyframe %d - pausing, press a key to continue...\n', kf_num);
-            end
+        if keyframes_data.indices(kf_idx) == i
+            fprintf('Reached keyframe %d (%s) - pausing, press a key to continue...\n', i, keyframes_data.names{kf_idx});
             pause();
+            kf_idx = kf_idx + 1;
         else
             pause(pause_time);
         end

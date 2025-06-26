@@ -1,4 +1,6 @@
-function [axs] = create_environment(tablePosition, tableParams)
+function [axs] = create_environment()
+    parameters(1);
+
     axs = gca;
     axs.AmbientLightColor = [0.6 0.6 0.6];
 
@@ -35,7 +37,7 @@ function [axs] = create_environment(tablePosition, tableParams)
     tableColor = [0.6, 0.4, 0.2];
 
     % Draw table top
-    [X, Y] = meshgrid([-tableParams.length/2:0.05:tableParams.length/2], [-tableParams.width/2:0.05:tableParams.width/2]);
+    [X, Y] = meshgrid(-tableParams.length/2:0.05:tableParams.length/2, -tableParams.width/2:0.05:tableParams.width/2);
     Z = zeros(size(X)) + tableParams.height;  % Table is at Z=tableHeight in world frame
     tableSurf = surf(X, Y, Z, 'FaceColor', [0.8 0.7 0.6], 'EdgeColor', 'none');
     set(tableSurf, 'AmbientStrength', 0.8, 'DiffuseStrength', 0.6, 'SpecularStrength', 0.1);

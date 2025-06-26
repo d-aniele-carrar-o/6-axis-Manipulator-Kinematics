@@ -71,6 +71,7 @@ show(robot_right, config_right, "Visuals", "on", "Frames", "on", "FastUpdate", t
 % Compute end-effector poses
 parameters(1, 1); [Te_w_e_left, Te_l]  = direct_kinematics(q0_left, 1);
 parameters(1, 2); [Te_w_e_right, Te_r] = direct_kinematics(q0_right, 2);
+step = 50;
 
 if use_recorded_motion
     % Load recorded motion data
@@ -81,7 +82,7 @@ if use_recorded_motion
         use_recorded_motion = false;
     else
         fprintf('Using motion file: %s\n', motion_file);
-        [q_left_all, q_right_all, use_keyframes, keyframe_indices] = load_motion_data(motion_file, q0_left, q0_right, Te_l, Te_r);
+        [q_left_all, q_right_all, ~, ~, keyframes_data] = load_motion_data(motion_file, q0_left, q0_right, step);
     end
 end
 
@@ -148,7 +149,7 @@ else
     pause(1);
     
     simulate_recorded_motion_dual(robot_left, robot_right, config_left, config_right, ...
-                                  q_left_all, q_right_all, use_keyframes, keyframe_indices, axs);
+                                  q_left_all, q_right_all, keyframes_data.available, keyframes_data.indices, axs);
 end
 
 fprintf('Simulation complete!\n');
@@ -157,7 +158,6 @@ fprintf('Simulation complete!\n');
 % Helper functions
 function simulate_recorded_motion_dual(robot_left, robot_right, config_left, config_right, q_left_all, q_right_all, use_keyframes, keyframe_indices, axs)
     if use_keyframes
-        step = 50;
         for i = 1:length(keyframe_indices)
             orig_idx = keyframe_indices(i);
             downsampled_idx = min(floor(orig_idx / step) + 1, size(q_left_all, 1));

@@ -3,8 +3,8 @@
 % Parameters:
 % - qi        : initial joint configuration
 % - viapoints : viapoints through which trajectory will pass - could be
-%               expressed in joint space - [6xN] - or task space - [4x4xN]
-% - times     : time intervals for each piece of trajectory [N+1] 
+%               expressed in joint space - [Nx6] - or task space - [Nx4x4]
+% - times     : time intervals for each piece of trajectory [N]
 function [time, positions, velocities] = multipoint_trajectory( qi, viapoints, times, robot_id )
     % Handle optional arguments
     if nargin < 4
@@ -15,12 +15,12 @@ function [time, positions, velocities] = multipoint_trajectory( qi, viapoints, t
     % Number of viapoints - pieces of trajectory to generate
     N = length( times );
 
-    % Determine viapoints space
-    if size( viapoints, 1 ) > N
-        % task space - [4x4xN] Hom-Transf matrices (end-effector poses)
+    % Determine viapoints space:
+    if size( viapoints, 2 ) == 4
+        % task space - [Nx4x4] Hom-Transf matrices (end-effector poses)
         vp_space = "task";
     else
-        % joint space - [6xN] joint configurations
+        % joint space - [Nx6] joint configurations
         vp_space = "joint";
     end
     
@@ -38,7 +38,7 @@ function [time, positions, velocities] = multipoint_trajectory( qi, viapoints, t
         % Extract first viapoint - desired pose/configuration
         if     vp_space == "joint"
             % Desired configuration is already in joint space -> nothing to do
-            qf = viapoints(i,:);
+            qf = viapoints(:,i);
             
             if space == "taks"
                 % Transform desired configuration from joint to task space
@@ -47,7 +47,7 @@ function [time, positions, velocities] = multipoint_trajectory( qi, viapoints, t
             end
 
         elseif vp_space == "task"
-            Tf = viapoints(4*(i-1)+1:4*i,:);
+            Tf = squeeze(viapoints(i,:,:));
 
             if     space == "joint"
                 % Transform desired pose from task space to joint space
@@ -69,9 +69,10 @@ function [time, positions, velocities] = multipoint_trajectory( qi, viapoints, t
         end
 
         % Generate trajectory from current joint configuration to desired pose
-        fprintf("[multipoint_trajectory] generating piece of trajectory for robot %d\n", robot_id)
-        % TODO: fix cubic & quintic not working for ti != 0
-        [t, p, v] = generate_trajectory( qi, qf, ti, ti+times(i), robot_id );
+        if verbose
+            fprintf("[multipoint_trajectory] generating piece of trajectory for robot %d\n", robot_id)
+        end
+        [t, p, v] = generate_trajectory( qi, qf, ti, ti+times(i)-dt, robot_id );
         
         time       = [time,    t+ti];
         positions  = [positions;  p];

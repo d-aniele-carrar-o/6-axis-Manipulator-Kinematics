@@ -53,3 +53,5 @@ clc; close all;
 % testing_script;
 % dual_robot_setup_simple
 % simulate_recorded_motion
+% test_augment_trajectory
+test_create_training_dataset
