@@ -28,7 +28,6 @@ addpath(fullfile(project_root, 'src'));
 addpath(fullfile(project_root, 'src', '3_link_manipulators'));
 addpath(fullfile(project_root, 'src', 'cpp_src'));
 addpath(fullfile(project_root, 'src', 'files_utils'));
-addpath(fullfile(project_root, 'src', 'keyframes_generation'));
 addpath(fullfile(project_root, 'src', 'kinematics'));
 addpath(fullfile(project_root, 'src', 'mex_compiled_functions'));
 addpath(fullfile(project_root, 'src', 'plot_utils'));
