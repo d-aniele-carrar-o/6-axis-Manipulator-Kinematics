@@ -9,14 +9,14 @@ function [q_l_all, q_r_all, poses_l_all, poses_r_all, keyframes_data] = ...
     %   step        - Downsampling step (default: 50)
     %
     % Returns:
-    %   q_l_all          - Joint configurations for left robot [Nx6] (includes keyframes)
-    %   q_r_all          - Joint configurations for right robot [Nx6] (includes keyframes)
-    %   poses_l_all      - End-effector poses for left robot [Nx4x4] (includes keyframes)
-    %   poses_r_all      - End-effector poses for right robot [Nx4x4] (includes keyframes)
-    %   keyframes_data   - Structure containing keyframe information with fields:
-    %     .available     - Boolean indicating if keyframes are available
-    %     .indices       - Indices of keyframes in the trajectory arrays (not original data)
-    %     .names         - Names of keyframes
+    %   q_l_all             - Joint configurations for left robot [Nx6] (includes keyframes)
+    %   q_r_all             - Joint configurations for right robot [Nx6] (includes keyframes)
+    %   poses_l_all         - End-effector poses for left robot [Nx4x4] (includes keyframes)
+    %   poses_r_all         - End-effector poses for right robot [Nx4x4] (includes keyframes)
+    %   keyframes_data      - Structure containing keyframe information with fields:
+    %     .available        - Boolean indicating if keyframes are available
+    %     .indices          - Indices of keyframes in the trajectory arrays (not original data)
+    %     .names            - Names of keyframes
     %     .original_indices - Original indices in the raw data
     parameters(1);
 

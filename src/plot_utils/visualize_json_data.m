@@ -30,6 +30,9 @@ function visualize_json_data(json_file_path)
 %   }
 % ]
 
+if nargin < 1
+    json_file_path = '/Users/danielecarraro/Documents/VSCODE/data/output/yoto/25-06-24-21-38-38_liftbox.json';
+end
 % Check if file exists
 if ~exist(json_file_path, 'file')
     error('JSON file not found: %s', json_file_path);

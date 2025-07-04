@@ -51,6 +51,7 @@ clc; close all;
 % compile_cpp_code
 % testing_script;
 % dual_robot_setup_simple
-% simulate_recorded_motion
 % test_augment_trajectory
-test_create_training_dataset
+% simulate_recorded_motion
+% simulate_inference
+testing_tfs_3d

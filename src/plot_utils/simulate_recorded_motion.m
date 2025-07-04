@@ -19,7 +19,8 @@ axs = create_environment();
 
 % File path
 % Example timestamp format: '25-06-24-21-30-34'
-timestamp = '25-06-24-21-30-34';
+timestamp = '25-06-24-21-38-38';
+% timestamp = '25-06-24-21-30-34';
 
 motion_file = find_closest_motion_file(timestamp);
 if isempty(motion_file)
@@ -35,6 +36,12 @@ try
     if ~isempty(scenePath)
         fprintf('Loading scene pointcloud from: %s\n', scenePath);
         scenePC = pcread(scenePath);
+        
+        % Transform pointclouds (scene + objects) - translate -2cm on world Y
+        translation = [0, -0.025, 0];
+        fprintf('Applying pointcloud transformation on world axis: [%.3f, %.3f, %.3f]\n', translation);
+        scenePC = pctransform(scenePC, rigid3d(eye(3), translation));
+        scenePC.Color = repmat(uint8([128 128 128]), scenePC.Count, 1); % Set scene color to grey        
         pcshow(scenePC, 'Parent', axs, 'MarkerSize', 20, 'VerticalAxisDir', 'up');
         
         % Load all segmented objects from the same directory
@@ -45,12 +52,17 @@ try
             fprintf('Found %d object files in directory\n', length(objectFiles));
             
             % RGB color values for different objects
-            colors = [1 0 0; 0 1 0; 0 0 1; 0 1 1; 1 0 1; 1 1 0; 0.5 0.5 0.5; 1 0.5 0];
-            
+            light_blue = [59, 121, 162];
+            brown = [92, 71, 50];
+            colors = [light_blue/255; brown/255; 0 0 1; 0 1 1; 1 0 1; 1 1 0; 0.5 0.5 0.5; 1 0.5 0];         
+
             for i = 1:length(objectFiles)
                 objPath = fullfile(objectFiles(i).folder, objectFiles(i).name);
                 fprintf('Loading object %d from: %s\n', i, objPath);
                 objectPC = pcread(objPath);
+                
+                % Apply same transformation to object pointclouds
+                objectPC = pctransform(objectPC, rigid3d(eye(3), translation));
                 
                 % Use different color for each object
                 colorIdx = mod(i-1, size(colors, 1)) + 1;
@@ -58,6 +70,7 @@ try
                 pcshow(objectPC, 'Parent', axs, 'MarkerSize', 30, 'VerticalAxisDir', 'up');
             end
         end
+    
     else
         fprintf('No scene pointcloud found for timestamp: %s\n', timestamp);
     end
@@ -70,8 +83,7 @@ q0_left  = [pi/2, -pi/3, 2*pi/3, -pi/3, pi/2, 0];
 q0_right = [-pi/2, -2*pi/3, -2*pi/3, -2*pi/3, -pi/2, 0];
 
 % Read and compute trajectories in world coordinates
-step = 50; % Downsample for trajectory simulation
-[q_l_all, q_r_all, poses_l_all, poses_r_all, keyframes_data] = load_motion_data(motion_file, q0_left, q0_right, step);
+[q_l_all, q_r_all, poses_l_all, poses_r_all, keyframes_data] = load_motion_data(motion_file, q0_left, q0_right);
 
 % Plot trajectories and get handles for simulation
 traj_left_handle  = plot_robot_trajectory(q_l_all, keyframes_data, 1, axs, 'r-', true, true);

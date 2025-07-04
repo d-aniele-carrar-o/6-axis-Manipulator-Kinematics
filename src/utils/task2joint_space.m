@@ -19,7 +19,7 @@ function [qs, q_dots] = task2joint_space( qi, task_positions, task_velocities )
     
     for i=1:N/4
         % Extract end-effector pose
-        Td     = task_positions(4*(i-1)+1:4*i,:);
+        Td = task_positions(4*(i-1)+1:4*i,:);
         
         % Compute corresponding joint configuration via IK
         if     manipulator == "UR5" || manipulator == "UR3e"
@@ -31,14 +31,17 @@ function [qs, q_dots] = task2joint_space( qi, task_positions, task_velocities )
         end
         
         % Extract closer solution to previous joint configuration
-        q     = get_closer( H, last_q );
+        q = get_closer( H, last_q );
         
-        % Compute joint velocities using inverse Jacobian
-        J     = Jacobian_cpp( Td, q, AL, A, D, TH );
-        q_dot = J \ task_velocities(i,:)';
+        % Velocities are given, transform them into joint space
+        if nargin > 2
+            % Compute joint velocities using inverse Jacobian
+            J     = Jacobian_cpp( Td, q, AL, A, D, TH );
+            q_dot = J \ task_velocities(i,:)';
+            q_dots(i,:) = q_dot';
+        end
 
         qs(i,:)     = q;
-        q_dots(i,:) = q_dot';
         last_q      = q;
 
     end

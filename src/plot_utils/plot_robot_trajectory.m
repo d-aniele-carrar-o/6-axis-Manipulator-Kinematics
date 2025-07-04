@@ -46,23 +46,24 @@ function [traj_handle] = plot_robot_trajectory(q_trajectory, keyframes_data, rob
                 continue;
             end
             
-            % Process grasping keyframe
-            robot_match = regexp(kf_name, 'r(\d+)', 'tokens');
-            if isempty(robot_match)
-                continue; % Skip if no robot number found and not boundary
-            end
-            kf_robot_num = str2double(robot_match{1}{1});
+            robot_match = regexp(kf_name, 'grasp_r(\d+)', 'tokens');
+            if ~isempty(robot_match)
+                % Process grasp keyframes
+                kf_robot_num = str2double(robot_match{1}{1});
             
-            % Map robot number to robot_id (4=left=1, 2=right=2)
-            kf_robot_id = (kf_robot_num == 4) * 1 + (kf_robot_num == 2) * 2;
-            
-            % Only plot keyframe if it belongs to current robot
-            if kf_robot_id ~= robot_id
-                continue;
-            end
+                % Map robot number to robot_id (4=left=1, 2=right=2)
+                kf_robot_id = (kf_robot_num == 4) * 1 + (kf_robot_num == 2) * 2;
 
+                % Only plot keyframe if it belongs to current robot
+                if kf_robot_id ~= robot_id
+                    continue;
+                end
+            end
+            
+            % Always process other keyframes (kinematic, dynamic, geometric)
             plot_keyframe(i, local_idx, keyframes_data, ee_pos, ee_rot, axs, line_style(1), robot_id, use_transformed, use_triad);
             local_idx = local_idx + 1;
+        
         end
     end
 end
@@ -101,8 +102,8 @@ function plot_keyframe(i, local_idx, keyframes_data, ee_pos, ee_rot, axs, color,
     end
     
     % Create text with white background and colored border
-    text(pos(1), pos(2), pos(3) + 0.08, kf_name, ...
-        'Color', color, 'FontSize', 10, 'FontWeight', 'bold', 'Parent', axs, ...
-        'HorizontalAlignment', 'center', 'BackgroundColor', 'white', ...
-        'EdgeColor', color, 'Margin', 2);
+    % text(pos(1), pos(2), pos(3) + 0.08, kf_name, ...
+    %     'Color', color, 'FontSize', 10, 'FontWeight', 'bold', 'Parent', axs, ...
+    %     'HorizontalAlignment', 'center', 'BackgroundColor', 'white', ...
+    %     'EdgeColor', color, 'Margin', 2);
 end

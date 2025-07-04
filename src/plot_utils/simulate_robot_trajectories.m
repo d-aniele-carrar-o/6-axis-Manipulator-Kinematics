@@ -70,7 +70,7 @@ function simulate_robot_trajectories(robot_left, robot_right, config_left, confi
         end
         
         % Check if current index is a keyframe
-        if keyframes_data.indices(kf_idx) == i
+        if kf_idx <= length(keyframes_data.indices) && keyframes_data.indices(kf_idx) == i
             fprintf('Reached keyframe %d (%s) - pausing, press a key to continue...\n', i, keyframes_data.names{kf_idx});
             pause();
             kf_idx = kf_idx + 1;
