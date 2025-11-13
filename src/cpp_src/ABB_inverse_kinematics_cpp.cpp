@@ -66,7 +66,7 @@ public:
         if ( impossible_conf_1 )
         {
             std::cout << "Impossible configuration given. Exiting." << std::endl;
-            exit(1);
+            // exit(1);
         }
         else
         {
@@ -87,7 +87,7 @@ public:
         if ( impossible_conf_2 )
         {
             std::cout << "Impossible configuration given. Exiting." << std::endl;
-            exit(1);
+            // exit(1);
         }
         else
         {
@@ -162,7 +162,7 @@ public:
         else
         {
             std::cout << "Singular configuration on theta 5. Exiting." << std::endl;
-            exit(1);
+            // exit(1);
         }
 
         if ( !(-0.000001 < th5_3 && th5_3 < 0.000001 || -0.000001 < th5_4 && th5_4 < 0.000001) )
@@ -175,7 +175,7 @@ public:
         else
         {
             std::cout << "Singular configuration on theta 5. Exiting." << std::endl;
-            exit(1);
+            // exit(1);
         }
         
 
@@ -194,7 +194,7 @@ public:
         else
         {
             std::cout << "Singular configuration on theta 5. Exiting." << std::endl;
-            exit(1);
+            // exit(1);
         }
 
         if ( !(-0.000001 < th5_7 && th5_7 < 0.000001 || -0.000001 < th5_8 && th5_8 < 0.000001) )
@@ -207,7 +207,7 @@ public:
         else
         {
             std::cout << "Singular configuration on theta 5. Exiting." << std::endl;
-            exit(1);
+            // exit(1);
         }
         
         

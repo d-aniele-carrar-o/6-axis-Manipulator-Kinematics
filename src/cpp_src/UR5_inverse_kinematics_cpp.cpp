@@ -62,9 +62,10 @@ public:
             cos_th5_1 = (pe[0]*sin(th1_1) - pe[1]*cos(th1_1) - D[4]) / D[6];
             cos_th5_2 = (pe[0]*sin(th1_2) - pe[1]*cos(th1_2) - D[4]) / D[6];
         }
-        double th5_1 = atan2( sqrt(1 - cos_th5_1*cos_th5_1), cos_th5_1 );
+        
+        double th5_1 = atan2( sqrt( abs(1 - cos_th5_1*cos_th5_1) ), cos_th5_1 );
         double th5_2 = -th5_1;
-        double th5_3 = atan2( sqrt(1 - cos_th5_2*cos_th5_2), cos_th5_2 );
+        double th5_3 = atan2( sqrt( abs(1 - cos_th5_2*cos_th5_2) ), cos_th5_2 );
         double th5_4 = -th5_3;
         // std::cout << "th5_1: " << th5_1 << ", th5_2: " << th5_2 << ", th5_3: " << th5_3 << ", th5_4: " << th5_4 << std::endl;
         
@@ -150,6 +151,7 @@ public:
         double cos_th3_2 = -(A[2]*A[2] + A[3]*A[3] - p41xz_2*p41xz_2) / (2*A[2]*A[3]);
         double cos_th3_3 = -(A[2]*A[2] + A[3]*A[3] - p41xz_3*p41xz_3) / (2*A[2]*A[3]);
         double cos_th3_4 = -(A[2]*A[2] + A[3]*A[3] - p41xz_4*p41xz_4) / (2*A[2]*A[3]);
+        // std::cout << "cos_th3_1: " << cos_th3_1 << ", cos_th3_2: " << cos_th3_2 << ", cos_th3_3: " << cos_th3_3 << ", cos_th3_4: " << cos_th3_4 << std::endl;
 
         double th3_1 = -atan2( sqrt(1-cos_th3_1*cos_th3_1), cos_th3_1 );
         double th3_2 = -atan2( sqrt(1-cos_th3_2*cos_th3_2), cos_th3_2 );

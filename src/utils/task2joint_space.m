@@ -24,7 +24,7 @@ function [qs, q_dots] = task2joint_space( qi, task_positions, task_velocities )
         % Compute corresponding joint configuration via IK
         if     manipulator == "UR5" || manipulator == "UR3e"
             H  = UR5_inverse_kinematics_cpp( Td(1:3,4), Td(1:3,1:3), AL, A, D );
-        elseif manipulator == "ABB"
+        elseif manipulator == "ABB" || manipulator == "3Dprinted"
             H  = ABB_inverse_kinematics_cpp( Td(1:3,4), Td(1:3,1:3), AL, A, D );
         elseif manipulator == "custom"
             H  = Custom_manipulator_inverse_kinematics_cpp( Td(1:3,4), Td(1:3,1:3), AL, A, D, TH );

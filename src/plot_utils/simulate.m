@@ -71,19 +71,23 @@ function [qf, handlesR] = simulate( robot, config, time, positions, gripper_posi
         config = set_robot_configuration( p(1,:), config );
         
         if ~existing_axes_given
-            axs = show( robot, config, "Visuals", "on", "Frames", "off", "FastUpdate", true, "PreservePlot", false ); hold on;
+            axs = show( robot, config, "Visuals", "on", "Frames", "on", "FastUpdate", true, "PreservePlot", false ); hold on;
         else
-            show( robot, config, "Visuals", "on", "Frames", "off", "FastUpdate", true, "PreservePlot", false, "Parent", axs ); hold on;
+            show( robot, config, "Visuals", "on", "Frames", "on", "FastUpdate", true, "PreservePlot", false, "Parent", axs ); hold on;
         end
 
         xlim([-1,1]); ylim([-1,1]); zlim([0,1.2]);
         view(3); grid on;
         
-        % Plot manipulator and scatter the positions of the end-effector to highlight trajectory 3D in space
+        % Pre-allocate trajectory points storage
+        traj_points = [];
+        
+        % Plot manipulator and initialize scatter plot for trajectory
         Te   = direct_kinematics_cpp( p(1,1:6), AL, A, D, TH );
         tmp  = (Trf_0 * Te(1:4,4))';
         p_ee = tmp(1:3);
-        scatter3( p_ee(1), p_ee(2), p_ee(3), 10, 'r.', 'Parent', axs ); hold on;
+        traj_points = p_ee;
+        h_scatter = scatter3( p_ee(1), p_ee(2), p_ee(3), 10, 'r.', 'Parent', axs ); hold on;
         
         k = waitforbuttonpress;
         while k ~= 1
@@ -93,12 +97,13 @@ function [qf, handlesR] = simulate( robot, config, time, positions, gripper_posi
         disp("[simulate] Simulation started.")
         for i=2:N
             config = set_robot_configuration( p(i,:), config );
-            show( robot, config, "Visuals", "on", "Frames", "off", "FastUpdate", true, "PreservePlot", false, "Parent", axs ); hold on;
+            show( robot, config, "Visuals", "on", "Frames", "on", "FastUpdate", true, "PreservePlot", false, "Parent", axs ); hold on;
             Te   = direct_kinematics_cpp( p(i,1:6), AL, A, D, TH );
             tmp  = (Trf_0 * Te(1:4,4))';
             p_ee = tmp(1:3);
             if (mod(i, 5) == 0)
-                scatter3( p_ee(1), p_ee(2), p_ee(3), 10, 'r.', 'Parent', axs ); hold on;
+                traj_points = [traj_points; p_ee];
+                set(h_scatter, 'XData', traj_points(:,1), 'YData', traj_points(:,2), 'ZData', traj_points(:,3));
             end
             waitfor( rate );
         end

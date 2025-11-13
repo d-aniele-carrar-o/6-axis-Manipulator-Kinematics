@@ -17,7 +17,7 @@ function [time, positions, velocities] = multipoint_trajectory( qi, viapoints, t
 
     % Determine viapoints space:
     if size( viapoints, 2 ) == 4
-        % task space - [Nx4x4] Hom-Transf matrices (end-effector poses)
+        % task space - [Nx4x4] Homog-Transf matrices (end-effector poses)
         vp_space = "task";
     else
         % joint space - [Nx6] joint configurations
@@ -47,13 +47,17 @@ function [time, positions, velocities] = multipoint_trajectory( qi, viapoints, t
             end
 
         elseif vp_space == "task"
-            Tf = squeeze(viapoints(i,:,:));
+            if length(size(viapoints)) == 3
+                Tf = squeeze(viapoints(i,:,:))  % For [Nx4x4] format
+            else
+                Tf = viapoints((i-1)*4+1:i*4,:)  % For [4Nx4] format  
+            end
 
             if     space == "joint"
                 % Transform desired pose from task space to joint space
                 if     manipulator == "UR5" || manipulator == "UR3e"
                     Hf = UR5_inverse_kinematics_cpp( Tf(1:3,4), Tf(1:3,1:3), AL, A, D );
-                elseif manipulator == "ABB"
+                elseif manipulator == "ABB" || manipulator == "3Dprinted"
                     Hf = ABB_inverse_kinematics_cpp( Tf(1:3,4), Tf(1:3,1:3), AL, A, D );
                 elseif manipulator == "custom"
                     Hf = Custom_manipulator_inverse_kinematics_cpp( Tf(1:3,4), Tf(1:3,1:3), AL, A, D, TH );
@@ -88,7 +92,7 @@ function [time, positions, velocities] = multipoint_trajectory( qi, viapoints, t
             % so it is necessary to convert it to joint space (through IK, different for each manipulator)
             if     manipulator == "UR5" || manipulator == "UR3e"
                 Hf  = UR5_inverse_kinematics_cpp( Tf(1:3,4), Tf(1:3,1:3), AL, A, D );
-            elseif manipulator == "ABB"
+            elseif manipulator == "ABB" || manipulator == "3Dprinted"
                 Hf  = ABB_inverse_kinematics_cpp( Tf(1:3,4), Tf(1:3,1:3), AL, A, D );
             elseif manipulator == "custom"
                 Hf  = Custom_manipulator_inverse_kinematics_cpp( Tf(1:3,4), Tf(1:3,1:3), AL, A, D, TH );

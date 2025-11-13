@@ -41,14 +41,14 @@ function parameters( level, robot_id )
     plot_grahps = false;
     % ---------------------------------------------------------------------------------------------
 
-    robot_types = ["UR3e", "UR3e"];  % each option can be ["ABB", "UR5", "UR3e", "custom"]
+    robot_types = ["3Dprinted", "UR3e"];  % each option can be ["ABB", "UR5", "UR3e", "custom"]
     
     % Select current robot based on robot_id
     % Manipulator in use for which compute kinematics for
     manipulator = robot_types(robot_id);
 
     % Use robot's urdf for visualization
-    real_robot = true;
+    real_robot = false;
 
     % Gripper presence depends on robot type
     gripper = (manipulator == "UR5" || manipulator == "custom");
@@ -94,6 +94,17 @@ function parameters( level, robot_id )
         D  = [  -0 ,   0.78,      0,      0,  2.012,      0,   0.25];
         TH = [  -0 ,      0,      0,      0,      0,      0,      0];
         %  th = |  -  |  th1  |  th2  |  th3  |  th4  |  th5  |  th6  |
+    
+    elseif manipulator == "3Dprinted"  % ================================================================
+        
+        % D-H parameters:
+        %   T :      0->1     1->2      2->3    3->4      4->5    5->6
+        %   i = |  0  |    1   |    2    |   3   |    4    |   5   |   6   |
+        AL = [    0,       pi/2,        0,   pi/2,    -pi/2,   pi/2,   -0  ];
+        A  = [    0,    0.03247,  0.14042,      0,        0,      0,   -0  ];
+        D  = [  -0 ,     0.0922,        0,      0,  0.15457,      0,   0.07];
+        TH = [  -0 ,          0,        0,      0,        0,      0,      0];
+        %  th = |  -  |   th1  |   th2   |  th3  |   th4   |  th5  |  th6  |
 
     elseif manipulator == "custom"  % =============================================================
         % Custom manipulator D-H parameters
@@ -114,7 +125,7 @@ function parameters( level, robot_id )
 
     % Define useful parameters for evnvironment simulation ========================================
     % Set table dimensions
-    tableHeight    = 0.76;
+    tableHeight    = 0.0;
     tableWidth     = 1.5;
     tableLength    = 0.75;
     tableParams.height = tableHeight;
@@ -123,7 +134,7 @@ function parameters( level, robot_id )
 
     tablePosition  = [0.0, 0.0, tableHeight];
     tableRoI       = [0.9, 0.65, 0.4];  % RoI for plane fitting in camera coords
-    standHeight    = 0.215;
+    standHeight    = 0; %0.215;
     robotsDistance = 1.12;  % Distance between robot's base origins
 
     % Transformation between World Reference Frame and Robot's Base Frame
@@ -139,11 +150,12 @@ function parameters( level, robot_id )
             eul2tform(baseOrientation, "XYZ") * trvec2tform(basePosition + [0,  robotsDistance/2, standHeight])
         };
     else
-        robot_base_transforms = {eul2tform([0, 0, 0], "XYZ") * trvec2tform(basePosition + [0, -0.4, 0] ) * eul2tform(baseOrientation + [0, 0, pi], "XYZ")};
+        % robot_base_transforms = {eul2tform([0, 0, 0], "XYZ") * trvec2tform(basePosition + [0, -0.4, 0] ) * eul2tform(baseOrientation + [0, 0, pi], "XYZ")};
+        robot_base_transforms = {trvec2tform(basePosition)};
     end
     
     Trf_0 = robot_base_transforms{robot_id};
-    if level == 0 && real_robot
+    if level == 0
         disp("Loading robot " + manipulator + " " + num2str(robot_id))
         [robot, config] = get_robot( manipulator, Trf_0 );
     end

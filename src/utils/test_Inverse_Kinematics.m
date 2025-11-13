@@ -15,6 +15,11 @@ function test_Inverse_Kinematics( q0, robot, config )
         H  = ABB_inverse_kinematics_cpp( Te(1:3,4), Te(1:3,1:3), AL, A, D );
     elseif manipulator == "custom"
         H  = Custom_manipulator_inverse_kinematics_cpp( Te(1:3,4), Te(1:3,1:3), AL, A, D, TH );
+    elseif manipulator == "3Dprinted"
+        % H  = printed_manipulator_inverse_kinematics_cpp( Te(1:3,4), Te(1:3,1:3), AL, A, D, TH );
+        H  = ABB_inverse_kinematics_cpp( Te(1:3,4), Te(1:3,1:3), AL, A, D, TH );
+    else
+        return
     end
 
     pause()

@@ -6,8 +6,9 @@ parameters(0)
 
 % Initial joint configuration
 % q0 = [0, -pi/6, -pi/2, -pi/3, -pi/2, 0.0]
-% q0 = [pi, -pi/2, 0, -pi/2, -pi/2, 0]
-q0 = [-pi/2, -2*pi/3, -2*pi/3, -2*pi/3, -pi/2, 0]
+q0 = [pi, -pi/2, 0, -pi/2, -pi/2, 0]
+% q0 = [pi/2, -2*pi/3, -2*pi/3, pi/2, -pi/2, 0]
+% q0 = [0,0,0,0,0,0]
 
 % Compute end-effector pose
 [T_w_e, Te] = direct_kinematics( q0 )
@@ -33,7 +34,7 @@ Rf    = Te(1:3,1:3) * eul2rotm_custom( phi_f );
 if     manipulator == "UR5"
     pf = [0; 0.5; 0.5];
 elseif manipulator == "UR3e"
-    pf = Te(1:3,4) + [0.4; 0.2; 0];
+    pf = Te(1:3,4) + [0.1; 0.2; 0];
 elseif manipulator == "ABB"
     pf = Te(1:3,4) + [0.0; 1.8; 0.0];
 elseif manipulator == "custom"
@@ -41,44 +42,47 @@ elseif manipulator == "custom"
     phi_f = [7/6*pi, 0, pi/2];
     Rf    = eul2rotm_custom( phi_f );
     pf    = [0.2; 0.2; 0.06];
+elseif manipulator == "3Dprinted"
+    pf = Te(1:3,4) + [-0.05; 0; 0.0];
+    Rf = Te(1:3,1:3);
 end
-Tf = [Rf, pf; 0,0,0,1]
-t1 = 1
+Tf = [Rf, pf; 0,0,0,1];
+t1 = 1;
 
 % Second viapoint: set second desired configuration/pose (viapoint)
 if     manipulator == "UR5"
-    Tf2 = Tf + [zeros(3), [-0.4; 0; 0]; 0,0,0,0]
+    Tf2 = Tf + [zeros(3), [-0.4; 0; 0]; 0,0,0,0];
 elseif manipulator == "UR3e"
-    Tf2 = Tf + [zeros(3), [0.2; 0.4; 0]; 0,0,0,0]
+    Tf2 = Tf + [zeros(3), [0.2; 0.4; 0]; 0,0,0,0];
 elseif manipulator == "ABB"
-    Tf2 = Tf + [zeros(3), [-1.8; 0; 0]; 0,0,0,0]
+    Tf2 = Tf + [zeros(3), [-1.8; 0; 0]; 0,0,0,0];
 elseif manipulator == "custom"
-    Tf2 = Tf + [zeros(3), [-0.4; 0; 0]; 0,0,0,0]
+    Tf2 = Tf + [zeros(3), [-0.4; 0; 0]; 0,0,0,0];
 end
 t2 = 2;
 
 % Third viapoint: set second desired configuration/pose (viapoint)
 if     manipulator == "UR5"
-    Tf3 = Tf2 + [zeros(3), [0; -0.4; 0]; 0,0,0,0]
+    Tf3 = Tf2 + [zeros(3), [0; -0.4; 0]; 0,0,0,0];
 elseif manipulator == "ABB"
-    Tf3 = Tf2 + [zeros(3), [0; -1.8; 0]; 0,0,0,0]
+    Tf3 = Tf2 + [zeros(3), [0; -1.8; 0]; 0,0,0,0];
 elseif manipulator == "custom"
-    Tf3 = Tf2 + [zeros(3), [0; -0.4; 0]; 0,0,0,0]
+    Tf3 = Tf2 + [zeros(3), [0; -0.4; 0]; 0,0,0,0];
 end
 t3 = 3;
 
 % Fourth viapoint: set second desired configuration/pose (viapoint)
 if     manipulator == "UR5"
-    Tf4 = Tf3 + [zeros(3), [0.4; 0; 0]; 0,0,0,0]
+    Tf4 = Tf3 + [zeros(3), [0.4; 0; 0]; 0,0,0,0];
 elseif manipulator == "ABB"
-    Tf4 = Tf3 + [zeros(3), [1.8; 0; 0]; 0,0,0,0]
+    Tf4 = Tf3 + [zeros(3), [1.8; 0; 0]; 0,0,0,0];
 elseif manipulator == "custom"
-    Tf4 = Tf3 + [zeros(3), [0.4; 0; 0]; 0,0,0,0]
+    Tf4 = Tf3 + [zeros(3), [0.4; 0; 0]; 0,0,0,0];
 end
 t4 = 4;
 
-viapoints = [Tf; Tf2];
-times     = [ti, t1, t2];
+viapoints = [Tf];
+times     = [t1];
 
 % Compute multi-viapoint trajectory for selected times and viapoints
 [t, p, v] = multipoint_trajectory( q0, viapoints, times );
