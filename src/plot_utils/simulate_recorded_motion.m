@@ -13,14 +13,14 @@ config_right = config;
 Trf_0_r = Trf_0;
 
 % Create environment
-figure('Name', '3D Robot Trajectory Visualization', 'Position', [100, 100, 1200, 800]);
+settings.matlab.appearance.figure.GraphicsTheme.TemporaryValue = "light";
+figure('Name', '3D Robot Trajectory Visualization', 'Position', [100, 100, 1200, 800], 'Color', 'white');
 hold on; grid on; axis equal;
 axs = create_environment();
 
 % File path
 % Example timestamp format: '25-06-24-21-30-34'
-timestamp = '25-06-24-21-38-38';
-% timestamp = '25-06-24-21-30-34';
+timestamp = '25-07-13-01-17-57';
 
 motion_file = find_closest_motion_file(timestamp);
 if isempty(motion_file)
@@ -38,7 +38,7 @@ try
         scenePC = pcread(scenePath);
         
         % Transform pointclouds (scene + objects) - translate -2cm on world Y
-        translation = [0, -0.025, 0];
+        translation = [0, 0, 0];
         fprintf('Applying pointcloud transformation on world axis: [%.3f, %.3f, %.3f]\n', translation);
         scenePC = pctransform(scenePC, rigid3d(eye(3), translation));
         scenePC.Color = repmat(uint8([128 128 128]), scenePC.Count, 1); % Set scene color to grey        
@@ -80,7 +80,8 @@ end
 
 % Initial configurations
 q0_left  = [pi/2, -pi/3, 2*pi/3, -pi/3, pi/2, 0];
-q0_right = [-pi/2, -2*pi/3, -2*pi/3, -2*pi/3, -pi/2, 0];
+% q0_right = [-pi/2, -2*pi/3, -2*pi/3, -2*pi/3, -pi/2, 0];
+q0_right = [pi/2, -pi/3, 2*pi/3, -pi/3, pi/2, 0];
 
 % Read and compute trajectories in world coordinates
 [q_l_all, q_r_all, poses_l_all, poses_r_all, keyframes_data] = load_motion_data(motion_file, q0_left, q0_right);
@@ -109,11 +110,15 @@ title('3D Robot Trajectories with Keyframes', 'FontSize', 14);
 xlabel('X (m)'); ylabel('Y (m)'); zlabel('Z (m)');
 view(45, 30);
 axis equal;
+% Set background colors AFTER creating environment
+set(gcf, 'Color', 'w');   % Figure background
+set(axs, 'Color', 'w');   % Axes background
+set(0,'defaultfigurecolor',[1 1 1]);
 
 % Simulate robot trajectories
-fprintf('Starting trajectory simulation, press a key to continue...\n');
-pause()
-simulate_robot_trajectories(robot_left, robot_right, config_left, config_right, ...
-                            q_l_all, q_r_all, keyframes_data, axs, traj_left_handle, traj_right_handle);
+% fprintf('Starting trajectory simulation, press a key to continue...\n');
+% pause()
+% simulate_robot_trajectories(robot_left, robot_right, config_left, config_right, ...
+%                             q_l_all, q_r_all, keyframes_data, axs, traj_left_handle, traj_right_handle);
 
-fprintf('3D trajectory visualization completed\n');
+% fprintf('3D trajectory visualization completed\n');

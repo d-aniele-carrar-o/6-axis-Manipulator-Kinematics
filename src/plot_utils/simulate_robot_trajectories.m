@@ -6,17 +6,38 @@ function simulate_robot_trajectories(robot_left, robot_right, config_left, confi
     % Animation parameters
     pause_time = 0.05; % Seconds between frames
     
-    % Get trajectory data
-    left_x  = get(traj_left_handle, 'XData');
-    left_y  = get(traj_left_handle, 'YData');
-    left_z  = get(traj_left_handle, 'ZData');
-    right_x = get(traj_right_handle, 'XData');
-    right_y = get(traj_right_handle, 'YData');
-    right_z = get(traj_right_handle, 'ZData');
+    % Get trajectory data (handles may be arrays)
+    if length(traj_left_handle) > 1
+        % Concatenate data from multiple segments
+        left_x = []; left_y = []; left_z = [];
+        for h = traj_left_handle'
+            left_x = [left_x, get(h, 'XData')];
+            left_y = [left_y, get(h, 'YData')];
+            left_z = [left_z, get(h, 'ZData')];
+        end
+    else
+        left_x = get(traj_left_handle, 'XData');
+        left_y = get(traj_left_handle, 'YData');
+        left_z = get(traj_left_handle, 'ZData');
+    end
+    
+    if length(traj_right_handle) > 1
+        % Concatenate data from multiple segments
+        right_x = []; right_y = []; right_z = [];
+        for h = traj_right_handle'
+            right_x = [right_x, get(h, 'XData')];
+            right_y = [right_y, get(h, 'YData')];
+            right_z = [right_z, get(h, 'ZData')];
+        end
+    else
+        right_x = get(traj_right_handle, 'XData');
+        right_y = get(traj_right_handle, 'YData');
+        right_z = get(traj_right_handle, 'ZData');
+    end
     
     % Delete original trajectories
-    delete(traj_left_handle);
-    delete(traj_right_handle);
+    delete(traj_left_handle(isvalid(traj_left_handle)));
+    delete(traj_right_handle(isvalid(traj_right_handle)));
     
     % Store trajectory plot handles for clearing
     traj_plots = [];
@@ -77,7 +98,9 @@ function simulate_robot_trajectories(robot_left, robot_right, config_left, confi
         else
             pause(pause_time);
         end
-        
+        % Change the background color to white
+        set(gcf, 'Color', 'w'); % Set figure background color to white
+        set(gca, 'Color', 'w'); % Set axes background color to white
         drawnow;
     end
     

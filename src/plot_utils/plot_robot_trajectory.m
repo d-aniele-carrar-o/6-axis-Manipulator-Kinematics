@@ -29,8 +29,27 @@ function [traj_handle] = plot_robot_trajectory(q_trajectory, keyframes_data, rob
     % Compute end-effector positions for each configuration
     [ee_pos, ee_rot] = get_end_effector_trajectory(q_trajectory, robot_id, world_rf);
     
-    % Plot trajectory
-    traj_handle = plot3(ee_pos(:,1), ee_pos(:,2), ee_pos(:,3), line_style, 'LineWidth', 2, 'Parent', axs);
+    % Plot trajectory with gradient coloring
+    n_points = size(ee_pos, 1);
+    if n_points > 1
+        % Create gradient colors based on line_style color
+        base_color = line_style(1); % 'r' or 'b'
+        if base_color == 'r'
+            colors = [linspace(1, 0.3, n_points)', linspace(0.7, 0, n_points)', linspace(0.7, 0, n_points)'];
+        else % blue
+            colors = [linspace(0.7, 0, n_points)', linspace(0.7, 0, n_points)', linspace(1, 0.3, n_points)'];
+        end
+        
+        % Plot trajectory segments with gradient
+        traj_handle = [];
+        for i = 1:n_points-1
+            h = plot3(ee_pos(i:i+1,1), ee_pos(i:i+1,2), ee_pos(i:i+1,3), ...
+                     'Color', colors(i,:), 'LineWidth', 3, 'Parent', axs);
+            traj_handle = [traj_handle; h];
+        end
+    else
+        traj_handle = plot3(ee_pos(:,1), ee_pos(:,2), ee_pos(:,3), line_style, 'LineWidth', 3, 'Parent', axs);
+    end
     
     % Highlight keyframes if available
     if keyframes_data.available
@@ -94,7 +113,7 @@ function plot_keyframe(i, local_idx, keyframes_data, ee_pos, ee_rot, axs, color,
     % Visualize keyframe
     if use_triad
         % Use triad for coordinate frame visualization
-        triad('Parent', axs, 'Scale', 0.05, 'LineWidth', 2, 'Matrix', T, ...
+        triad('Parent', axs, 'Scale', 0.075, 'LineWidth', 2, 'Matrix', T, ...
                 'Tag', sprintf('Keyframe %d Robot %d', i, robot_id));
     else
         % Simple marker

@@ -1,4 +1,5 @@
 function [axs] = create_environment()
+    set(gca, 'Color', 'w'); % Set the plot background to white
     parameters(1);
 
     axs = gca;
