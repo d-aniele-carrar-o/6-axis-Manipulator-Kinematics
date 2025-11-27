@@ -243,14 +243,25 @@ class CNCController:
         """
         Run the control loop.
         """
-        time_log = []
-        q_log = []
-        q_dot_log = []
-        vd_log = []     # Desired task velocities
-        v_act_log = []  # Actual task velocities
-        pd_log = []     # Desired position
-        rpy_d_log = []  # Desired orientation (RPY)
-        segment_end_times = [] # Times when each segment ends
+        # Initialize logs with STARTING state (t=0)
+        time_log = [0.0]
+        q_log = [start_q.copy()]
+        q_dot_log = [np.zeros(6)]
+        
+        # Initial Desired State (from start of first segment)
+        if segments:
+            p0 = segments[0].start_pose[:3, 3]
+            r0 = R.from_matrix(segments[0].start_pose[:3, :3]).as_euler('xyz')
+        else:
+            p0 = np.zeros(3)
+            r0 = np.zeros(3)
+            
+        pd_log = [p0]
+        rpy_d_log = [r0]
+        vd_log = [np.zeros(6)]
+        v_act_log = [np.zeros(6)]
+        
+        segment_end_times = []
         
         current_q = start_q.copy()
         current_time = 0.0
@@ -263,7 +274,6 @@ class CNCController:
             idx = 0
             while True:
                 # 1. Get Setpoint (Interpolator)
-                # If idx exceeds profile length, returns P_end, v=0, is_done=True
                 Td, vd, is_done_profile = segment.get_state(idx)
                 
                 # 2. Check Execution Status
@@ -277,18 +287,12 @@ class CNCController:
                 rot_vec = R.from_matrix(R_err).as_rotvec()
                 angle_err = np.linalg.norm(rot_vec)
                 
-                # Exit Condition: Profile Finished AND Physical Error Small (Exact Stop)
+                # Exit Condition
                 if is_done_profile:
-                    # Record the time when the segment finishes
                     segment_end_times.append(current_time)
-                    
-                    # G64: Continuous Path (Approximate) - Don't wait for settle
                     if segment.mode == 'continuous':
-                         print(f"    Continuous transition (G64). Pos Error: {p_err*1000:.3f}mm, Orien Error: {np.rad2deg(angle_err):.3f}deg")
+                         print(f"    Continuous transition (G64). Pos Error: {p_err*1000:.3f}mm")
                          break
-                    
-                    # G61: Exact Stop - Wait for settle
-                    # Thresholds: 0.1mm, 0.01deg
                     if p_err < 1e-4 and angle_err < np.radians(0.01):
                         break
                 
@@ -301,6 +305,7 @@ class CNCController:
                 v_actual = J @ q_dot
                 
                 current_q = next_q
+                current_time += dt
                 
                 # Logging
                 time_log.append(current_time)
@@ -309,12 +314,10 @@ class CNCController:
                 vd_log.append(vd)
                 v_act_log.append(v_actual)
                 
-                # Desired Pose Logging
                 pd_log.append(Td[:3, 3])
                 rpy_d = R.from_matrix(Td[:3, :3]).as_euler('xyz')
                 rpy_d_log.append(rpy_d)
                 
-                current_time += dt
                 idx += 1
                 
         return (np.array(time_log), np.array(q_log), np.array(q_dot_log),
@@ -560,14 +563,36 @@ class RealRobotInterface:
     def stream_trajectory(self, q_traj: np.ndarray, time_traj: np.ndarray, start_q: np.ndarray):
         """
         Stream the generated trajectory to the Arduino.
-        DOWNSAMPLES to avoid overwhelming the serial/buffer if dt is small.
-        Recommended: ~10-20 points per second.
         """
+        # --- SAFEGUARD ANALYSIS ---
+        print("\n--- Trajectory Analysis ---")
+        q_traj_5 = q_traj[:, :5]
+        min_q = np.min(q_traj_5, axis=0)
+        max_q = np.max(q_traj_5, axis=0)
+        range_q = max_q - min_q
+        
+        axes_names = ['X (J1)', 'Y (J2)', 'Z (J3)', 'A (J4)', 'B (J5)']
+        for i in range(5):
+            steps_range = int(range_q[i] * self.steps_per_rad[i])
+            print(f"Axis {axes_names[i]}: Range {np.rad2deg(range_q[i]):.2f} deg ({steps_range} steps)")
+            if steps_range > 0:
+                 print(f"  -> MOVING")
+        
+        # Check start point consistency
+        start_steps = self.rad_to_steps(q_traj[0], start_q)
+        print(f"Start Step Error: {start_steps} (Should be all zeros)")
+        if np.any(np.abs(start_steps) > 10):
+            print("WARNING: Trajectory does not start at Home configuration!")
+            
+        if input("\nConfirm execution on REAL ROBOT? (y/n): ").lower() != 'y':
+            print("Aborted.")
+            return
+
         print("Streaming trajectory to robot...")
         
         # Downsample to target freq (e.g., 20Hz -> dt=0.05s)
         target_dt = 0.05
-        original_dt = time_traj[1] - time_traj[0]
+        original_dt = time_traj[1] - time_traj[0] if len(time_traj) > 1 else target_dt
         step = int(target_dt / original_dt)
         if step < 1: step = 1
         
@@ -586,8 +611,6 @@ class RealRobotInterface:
             steps = self.rad_to_steps(q_curr, start_q)
             
             # Calculate Speed (Feedrate)
-            # F is usually steps/sec or mm/min. 
-            # Arduino code uses speed in steps/sec directly as feedrate (or max speed).
             if i < len(indices) - 1:
                 idx_next = indices[i+1]
                 dt_segment = time_traj[idx_next] - time_traj[idx]
@@ -618,16 +641,6 @@ class RealRobotInterface:
 
     def send_command(self, cmd):
         # We need to ensure we don't overflow the buffer.
-        # Strategy: 
-        # 1. Decrement slots when sending.
-        # 2. Read lines from Arduino. 
-        #    "OK" -> command accepted (no slot change logic needed if we count slots as "pending execution")
-        #    "DONE" -> command finished execution (slot freed)
-        
-        # Actually, the Arduino buffer is a ring buffer of COMMANDS.
-        # "OK" means it was added to the ring buffer. So slots--.
-        # "DONE" means it was removed from the ring buffer. So slots++.
-        
         while self.buffer_slots <= 0:
             self.process_incoming()
             time.sleep(0.001)
@@ -654,7 +667,7 @@ class RealRobotInterface:
                 self.buffer_slots += 1
                 if self.buffer_slots > self.BUFFER_SIZE: self.buffer_slots = self.BUFFER_SIZE
             elif line == "OK":
-                pass # Should be handled in send_command, but if late, ignore
+                pass 
             elif line:
                 print(f"Arduino Async: {line}")
 
@@ -725,7 +738,7 @@ if __name__ == "__main__":
                 
                 # Verify Home Position
                 print("Note: Ensure robot is physically at HOME position before starting.")
-                input("Press Enter to start streaming...")
+                # input("Press Enter to start streaming...") # Moved to inside stream_trajectory
                 
                 rr.stream_trajectory(q_traj, time_log, robot.home_config)
                 
