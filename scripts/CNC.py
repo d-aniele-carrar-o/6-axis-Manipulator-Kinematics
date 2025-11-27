@@ -519,6 +519,11 @@ class RealRobotInterface:
         # Delta from start position
         q_delta = q_rad[:5] - start_q[:5]
         steps = q_delta * self.steps_per_rad
+        
+        # Reverse direction for joints 3 and 5 (indices 2 and 4)
+        steps[2] = -steps[2]  # Joint 3 (Z axis)
+        steps[4] = -steps[4]  # Joint 5 (B axis)
+        
         return steps.astype(int)
 
     def wait_for_ready(self):
@@ -675,14 +680,14 @@ class RealRobotInterface:
 # --- Main Execution ---
 
 if __name__ == "__main__":
-    robot = RobotKinematics("3Dprinted", home_config=np.array([-np.pi/4, np.pi/2, 0.0, 0.0, -np.pi/2, 0.0]))
+    robot = RobotKinematics("3Dprinted", home_config=np.array([0.0, np.pi/2, 0.0, 0.0, -np.pi/2, 0.0]))
     planner = CNCPlanner()
     controller = CNCController(robot)
     
     # 1. Define Trajectory (G-Code like commands)
     planner.add_move(
-        position=robot.get_home_pose()[:3, 3] + np.array([0.0, 0.1, 0.0]), 
-        euler_rpy=R.from_matrix(robot.get_home_pose()[:3, :3]).as_euler('xyz'),
+        position=robot.get_home_pose()[:3, 3] + np.array([0.0, -0.05, 0.0]), 
+        euler_rpy=R.from_matrix(robot.get_home_pose()[:3, :3]).as_euler('xyz') + np.array([np.pi/4, 0, 0]),
         v_max=0.1, a_max=0.5,
         mode='exact_stop'
     )
@@ -723,8 +728,8 @@ if __name__ == "__main__":
         desired_trajectory.append(seg.end_pose)
     
     # Uncomment to show visualization
-    # visualizer = TrajectoryVisualizer(robot)
-    # visualizer.animate_trajectory([q_traj[i] for i in range(len(q_traj))], desired_trajectory)
+    visualizer = TrajectoryVisualizer(robot)
+    visualizer.animate_trajectory([q_traj[i] for i in range(len(q_traj))], desired_trajectory)
     
     # 5. Real Robot Execution
     if HAS_SERIAL:
