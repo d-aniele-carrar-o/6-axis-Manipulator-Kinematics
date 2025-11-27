@@ -5,6 +5,18 @@ from scipy.spatial.transform import Rotation as R
 from scipy.spatial.transform import Slerp
 from abc import ABC, abstractmethod
 from matplotlib.animation import FuncAnimation
+import time
+import sys
+
+# Try importing pyserial, handle if missing
+try:
+    import serial
+    import serial.tools.list_ports
+    HAS_SERIAL = True
+except ImportError:
+    HAS_SERIAL = False
+    print("Warning: pyserial not installed. Real robot communication will be unavailable.")
+    print("Install with: pip install pyserial")
 
 from robot_kinematics import RobotKinematics
 
@@ -450,6 +462,165 @@ class TrajectoryVisualizer:
         plt.show()
         return anim
 
+# --- Real Robot Interface ---
+
+class RealRobotInterface:
+    def __init__(self, port=None, baud=115200):
+        if not HAS_SERIAL:
+            raise ImportError("pyserial module is required.")
+        
+        if port is None:
+            ports = list(serial.tools.list_ports.comports())
+            if not ports:
+                raise Exception("No serial ports found!")
+            print("Available ports:")
+            for p in ports:
+                print(f" - {p.device}")
+            port = ports[0].device
+            print(f"Selecting {port}")
+            
+        self.ser = serial.Serial(port, baud, timeout=1)
+        time.sleep(2) # Wait for Arduino reset
+        self.clear_buffer()
+        print("Connected to Real Robot.")
+        
+        # Calibration Data (Steps per 90 degrees)
+        self.steps_90_deg = np.array([99000, 146000, 139500, 170000, 138000])
+        self.steps_per_rad = self.steps_90_deg / (np.pi / 2.0)
+        
+        # Buffer Tracking
+        self.BUFFER_SIZE = 64
+        self.buffer_slots = self.BUFFER_SIZE
+        
+    def clear_buffer(self):
+        self.ser.reset_input_buffer()
+        while self.ser.in_waiting:
+            self.ser.read()
+            
+    def rad_to_steps(self, q_rad: np.ndarray, start_q: np.ndarray) -> np.ndarray:
+        """
+        Convert joint angles to steps. 
+        Assumes robot starts at 'start_q' which corresponds to 0 steps.
+        Only returns first 5 axes.
+        """
+        # Delta from start position
+        q_delta = q_rad[:5] - start_q[:5]
+        steps = q_delta * self.steps_per_rad
+        return steps.astype(int)
+
+    def wait_for_ready(self):
+        """Wait for Arduino to send READY string"""
+        print("Waiting for Arduino...")
+        while True:
+            if self.ser.in_waiting:
+                line = self.ser.readline().decode().strip()
+                if "READY" in line:
+                    print("Arduino Ready.")
+                    break
+                print(f"Arduino: {line}")
+            time.sleep(0.1)
+
+    def stream_trajectory(self, q_traj: np.ndarray, time_traj: np.ndarray, start_q: np.ndarray):
+        """
+        Stream the generated trajectory to the Arduino.
+        DOWNSAMPLES to avoid overwhelming the serial/buffer if dt is small.
+        Recommended: ~10-20 points per second.
+        """
+        print("Streaming trajectory to robot...")
+        
+        # Downsample to target freq (e.g., 20Hz -> dt=0.05s)
+        target_dt = 0.05
+        original_dt = time_traj[1] - time_traj[0]
+        step = int(target_dt / original_dt)
+        if step < 1: step = 1
+        
+        indices = list(range(0, len(q_traj), step))
+        if indices[-1] != len(q_traj) - 1:
+            indices.append(len(q_traj) - 1)
+            
+        print(f"Downsampling: Sending {len(indices)} points (from {len(q_traj)} generated).")
+        
+        total_points = len(indices)
+        sent_count = 0
+        
+        for i in range(len(indices)):
+            idx = indices[i]
+            q_curr = q_traj[idx]
+            steps = self.rad_to_steps(q_curr, start_q)
+            
+            # Calculate Speed (Feedrate)
+            # F is usually steps/sec or mm/min. 
+            # Arduino code uses speed in steps/sec directly as feedrate (or max speed).
+            if i < len(indices) - 1:
+                idx_next = indices[i+1]
+                dt_segment = time_traj[idx_next] - time_traj[idx]
+                
+                q_next = q_traj[idx_next]
+                steps_next = self.rad_to_steps(q_next, start_q)
+                
+                # Max steps to travel in this segment among all axes
+                max_diff = np.max(np.abs(steps_next - steps))
+                
+                if dt_segment > 0 and max_diff > 0:
+                    speed = max_diff / dt_segment
+                else:
+                    speed = 2000 # Default/Idle speed
+            else:
+                speed = 2000
+                
+            # Construct G-Code
+            cmd = f"G1 X{steps[0]} Y{steps[1]} Z{steps[2]} A{steps[3]} B{steps[4]} F{speed:.1f}\n"
+            
+            # Flow Control
+            self.send_command(cmd)
+            sent_count += 1
+            if sent_count % 10 == 0:
+                print(f"Sent {sent_count}/{total_points}...")
+
+        print("Trajectory transmission complete.")
+
+    def send_command(self, cmd):
+        # We need to ensure we don't overflow the buffer.
+        # Strategy: 
+        # 1. Decrement slots when sending.
+        # 2. Read lines from Arduino. 
+        #    "OK" -> command accepted (no slot change logic needed if we count slots as "pending execution")
+        #    "DONE" -> command finished execution (slot freed)
+        
+        # Actually, the Arduino buffer is a ring buffer of COMMANDS.
+        # "OK" means it was added to the ring buffer. So slots--.
+        # "DONE" means it was removed from the ring buffer. So slots++.
+        
+        while self.buffer_slots <= 0:
+            self.process_incoming()
+            time.sleep(0.001)
+            
+        self.ser.write(cmd.encode())
+        self.buffer_slots -= 1
+        
+        # Wait for "OK" to confirm receipt
+        while True:
+            line = self.ser.readline().decode().strip()
+            if line == "OK":
+                break
+            elif line == "DONE":
+                self.buffer_slots += 1
+                if self.buffer_slots > self.BUFFER_SIZE: self.buffer_slots = self.BUFFER_SIZE
+            elif line:
+                print(f"Arduino Msg: {line}")
+                
+    def process_incoming(self):
+        """Read any pending DONE messages to free slots"""
+        while self.ser.in_waiting:
+            line = self.ser.readline().decode().strip()
+            if line == "DONE":
+                self.buffer_slots += 1
+                if self.buffer_slots > self.BUFFER_SIZE: self.buffer_slots = self.BUFFER_SIZE
+            elif line == "OK":
+                pass # Should be handled in send_command, but if late, ignore
+            elif line:
+                print(f"Arduino Async: {line}")
+
 
 # --- Main Execution ---
 
@@ -471,12 +642,6 @@ if __name__ == "__main__":
     #     v_max=0.15, a_max=0.5,
     #     mode='exact_stop'
     # )
-    # planner.add_move(
-    #     position=np.array([0.15, -0.1, 0.15]), 
-    #     euler_rpy=[0, 0, 0], 
-    #     v_max=0.1, a_max=0.5,
-    #     mode='exact_stop'
-    # )
     
     # 2. Plan (Generate Segments)
     print("Generating CNC Path...")
@@ -484,12 +649,12 @@ if __name__ == "__main__":
     segments = planner.plan(start_T, dt=0.01)
     
     # 3. Execute (Control Loop)
-    time, q_traj, q_dot_traj, vd_log, v_act_log, pd_log, rpy_d_log, segment_end_times = controller.execute(segments, robot.home_config)
+    time_log, q_traj, q_dot_traj, vd_log, v_act_log, pd_log, rpy_d_log, segment_end_times = controller.execute(segments, robot.home_config)
     
     # 4. Visualization
-    if len(time) == 0:
+    if len(time_log) == 0:
         print("Error: No trajectory generated.")
-        exit(1)
+        sys.exit(1)
         
     # Reconstruct Actual Path (Pose)
     p_act_log = []
@@ -502,121 +667,32 @@ if __name__ == "__main__":
     rpy_act_log = np.array(rpy_act_log)
 
     # Prepare desired trajectory for visualization
-    # We reconstruct it from segments for accuracy
     desired_trajectory = []
-    # Start
     desired_trajectory.append(start_T)
-    # Ends of each segment
     for seg in segments:
         desired_trajectory.append(seg.end_pose)
     
-    visualizer = TrajectoryVisualizer(robot)
+    # Uncomment to show visualization
+    # visualizer = TrajectoryVisualizer(robot)
+    # visualizer.animate_trajectory([q_traj[i] for i in range(len(q_traj))], desired_trajectory)
     
-    # Animate
-    q_traj_list = [q_traj[i] for i in range(len(q_traj))]
-    anim = visualizer.animate_trajectory(q_traj_list, desired_trajectory)
-    
-    # Plots
-    fig = plt.figure(figsize=(16, 12))
-    
-    # Helper to add via-point lines
-    def add_viapoints(ax):
-        for t_via in segment_end_times:
-            ax.axvline(x=t_via, color='k', linestyle=':', alpha=0.5, linewidth=1.5)
-    
-    # --- 1,1 (Top-Left): Task EE Position + Orientation ---
-    ax1 = fig.add_subplot(2, 2, 1)
-    
-    # Position (Left Axis)
-    colors_pos = ['r', 'g', 'b']
-    labels_pos = ['X', 'Y', 'Z']
-    lns1 = []
-    for i in range(3):
-        l1, = ax1.plot(time, pd_log[:, i], color=colors_pos[i], linestyle='--', label=f'{labels_pos[i]} des')
-        l2, = ax1.plot(time, p_act_log[:, i], color=colors_pos[i], linestyle='-', label=f'{labels_pos[i]} act')
-        lns1.extend([l1, l2])
-        
-    ax1.set_title("Task Position & Orientation")
-    ax1.set_ylabel("Position (m)")
-    ax1.grid(True)
-    add_viapoints(ax1)
-    
-    # Orientation (Right Axis)
-    ax1b = ax1.twinx()
-    colors_ori = ['c', 'm', 'y'] # Cyan, Magenta, Yellow for distinctness
-    labels_ori = ['R', 'P', 'Y']
-    # Unwrap angles
-    rpy_d_unwrapped = np.unwrap(rpy_d_log, axis=0)
-    rpy_act_unwrapped = np.unwrap(rpy_act_log, axis=0)
-    
-    lns2 = []
-    for i in range(3):
-        l1, = ax1b.plot(time, np.rad2deg(rpy_d_unwrapped[:, i]), color=colors_ori[i], linestyle='--', label=f'{labels_ori[i]} des')
-        l2, = ax1b.plot(time, np.rad2deg(rpy_act_unwrapped[:, i]), color=colors_ori[i], linestyle='-', label=f'{labels_ori[i]} act')
-        lns2.extend([l1, l2])
-        
-    ax1b.set_ylabel("Orientation (deg)")
-    
-    # Combined Legend
-    lns = lns1 + lns2
-    labs = [l.get_label() for l in lns]
-    ax1.legend(lns, labs, loc='center left', bbox_to_anchor=(1.1, 0.5), fontsize='x-small')
-
-
-    # --- 1,2 (Top-Right): Joint Space Configurations ---
-    ax2 = fig.add_subplot(2, 2, 2)
-    for i in range(6):
-        ax2.plot(time, np.rad2deg(q_traj[:, i]), label=f'q{i+1}')
-    ax2.set_title("Joint Angles (deg)")
-    ax2.set_ylabel("Angle (deg)")
-    ax2.legend(ncol=3, fontsize='small')
-    ax2.grid(True)
-    add_viapoints(ax2)
-
-
-    # --- 2,1 (Bottom-Left): Task Velocities (Linear + Angular) ---
-    ax3 = fig.add_subplot(2, 2, 3)
-    
-    # Linear Velocity (Left Axis)
-    lns3 = []
-    for i in range(3):
-        l1, = ax3.plot(time, vd_log[:, i], color=colors_pos[i], linestyle='--', label=f'v{labels_pos[i].lower()} des')
-        l2, = ax3.plot(time, v_act_log[:, i], color=colors_pos[i], linestyle='-', label=f'v{labels_pos[i].lower()} act')
-        lns3.extend([l1, l2])
-        
-    ax3.set_title("Task Velocities")
-    ax3.set_xlabel("Time (s)")
-    ax3.set_ylabel("Linear Vel (m/s)")
-    ax3.grid(True)
-    add_viapoints(ax3)
-    
-    # Angular Velocity (Right Axis)
-    ax3b = ax3.twinx()
-    lns4 = []
-    labels_w = ['wx', 'wy', 'wz']
-    for i in range(3):
-        l1, = ax3b.plot(time, vd_log[:, i+3], color=colors_ori[i], linestyle='--', label=f'{labels_w[i]} des')
-        l2, = ax3b.plot(time, v_act_log[:, i+3], color=colors_ori[i], linestyle='-', label=f'{labels_w[i]} act')
-        lns4.extend([l1, l2])
-        
-    ax3b.set_ylabel("Angular Vel (rad/s)")
-    
-    # Combined Legend
-    lns_v = lns3 + lns4
-    labs_v = [l.get_label() for l in lns_v]
-    ax3.legend(lns_v, labs_v, loc='center left', bbox_to_anchor=(1.1, 0.5), fontsize='x-small')
-
-
-    # --- 2,2 (Bottom-Right): Joint Space Velocities ---
-    ax4 = fig.add_subplot(2, 2, 4)
-    for i in range(6):
-        ax4.plot(time, np.rad2deg(q_dot_traj[:, i]), label=f'dq{i+1}')
-    ax4.set_title("Joint Velocities (deg/s)")
-    ax4.set_xlabel("Time (s)")
-    ax4.set_ylabel("Velocity (deg/s)")
-    ax4.legend(ncol=3, fontsize='small')
-    ax4.grid(True)
-    add_viapoints(ax4)
-    
-    plt.tight_layout()
-    plt.show()
+    # 5. Real Robot Execution
+    if HAS_SERIAL:
+        print("\n--- Real Robot Execution ---")
+        user_input = input("Connect to real robot and execute? (y/n): ")
+        if user_input.lower() == 'y':
+            try:
+                # Specify port if known, e.g., port='/dev/ttyUSB0'
+                rr = RealRobotInterface()
+                rr.wait_for_ready()
+                
+                # Verify Home Position
+                print("Note: Ensure robot is physically at HOME position before starting.")
+                input("Press Enter to start streaming...")
+                
+                rr.stream_trajectory(q_traj, time_log, robot.home_config)
+                
+            except Exception as e:
+                print(f"Error executing on real robot: {e}")
+    else:
+        print("\nSkipping Real Robot execution (pyserial missing).")
