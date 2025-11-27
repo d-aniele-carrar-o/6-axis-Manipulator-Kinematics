@@ -66,6 +66,11 @@ void loop() {
   bool isMoving = steppers.run();
 
   // 2. LOAD NEXT MOVE IF IDLE & BUFFER HAS DATA
+  // The logic 'if (!isMoving && head != tail)' creates a stop-start motion (exact stop mode).
+  // For continuous motion, we should load the next point BEFORE the current one finishes completely if possible,
+  // but MultiStepper doesn't natively support blending moves.
+  // HOWEVER, we can minimize the idle time between moves.
+  
   if (!isMoving && head != tail) {
     // We finished the previous move (or are just starting)
     // Signal that a buffer slot has been freed
@@ -89,6 +94,9 @@ void loop() {
     
     // Advance tail
     tail = (tail + 1) % BUF_SIZE;
+    
+    // IMMEDIATELY call run() again to start the new move without waiting for next loop iteration
+    steppers.run(); 
   }
 
   // 3. READ SERIAL COMMANDS
@@ -134,10 +142,6 @@ void loop() {
          Serial.println("OK");
       }
     }
-    // If buffer is full, we DO NOT read from Serial. 
-    // This uses the hardware serial buffer effectively as backpressure.
-    // However, the hardware buffer is small (64 bytes).
-    // The Python script should manage flow control to avoid overflow.
   }
 }
 

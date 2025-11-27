@@ -595,8 +595,9 @@ class RealRobotInterface:
 
         print("Streaming trajectory to robot...")
         
-        # Downsample to target freq (e.g., 20Hz -> dt=0.05s)
-        target_dt = 0.05
+        # INCREASED FREQUENCY for smoother motion
+        # Target ~50Hz (dt = 0.02s) to reduce stutter
+        target_dt = 0.02 
         original_dt = time_traj[1] - time_traj[0] if len(time_traj) > 1 else target_dt
         step = int(target_dt / original_dt)
         if step < 1: step = 1
@@ -605,7 +606,7 @@ class RealRobotInterface:
         if indices[-1] != len(q_traj) - 1:
             indices.append(len(q_traj) - 1)
             
-        print(f"Downsampling: Sending {len(indices)} points (from {len(q_traj)} generated).")
+        print(f"Downsampling: Sending {len(indices)} points (from {len(q_traj)} generated). Target dt={target_dt}s")
         
         total_points = len(indices)
         sent_count = 0
@@ -639,7 +640,7 @@ class RealRobotInterface:
             # Flow Control
             self.send_command(cmd)
             sent_count += 1
-            if sent_count % 10 == 0:
+            if sent_count % 50 == 0:
                 print(f"Sent {sent_count}/{total_points}...")
 
         print("Trajectory transmission complete.")
@@ -662,7 +663,8 @@ class RealRobotInterface:
                 self.buffer_slots += 1
                 if self.buffer_slots > self.BUFFER_SIZE: self.buffer_slots = self.BUFFER_SIZE
             elif line:
-                print(f"Arduino Msg: {line}")
+                # print(f"Arduino Msg: {line}")
+                pass
                 
     def process_incoming(self):
         """Read any pending DONE messages to free slots"""
@@ -674,7 +676,8 @@ class RealRobotInterface:
             elif line == "OK":
                 pass 
             elif line:
-                print(f"Arduino Async: {line}")
+                # print(f"Arduino Async: {line}")
+                pass
 
 
 # --- Main Execution ---
