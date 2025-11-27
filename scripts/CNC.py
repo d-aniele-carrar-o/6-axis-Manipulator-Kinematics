@@ -1,3 +1,7 @@
+import sys
+import time
+import serial
+import serial.tools.list_ports
 import numpy as np
 import matplotlib.pyplot as plt
 from typing import List, Tuple, Dict, Optional
@@ -5,19 +9,8 @@ from scipy.spatial.transform import Rotation as R
 from scipy.spatial.transform import Slerp
 from abc import ABC, abstractmethod
 from matplotlib.animation import FuncAnimation
-import time
-import sys
 
-# Try importing pyserial, handle if missing
-try:
-    import serial
-    import serial.tools.list_ports
-    HAS_SERIAL = True
-except ImportError:
-    HAS_SERIAL = False
-    print("Warning: pyserial not installed. Real robot communication will be unavailable.")
-    print("Install with: pip install pyserial")
-
+from numpy import pi
 from robot_kinematics import RobotKinematics
 
 
@@ -469,9 +462,6 @@ class TrajectoryVisualizer:
 
 class RealRobotInterface:
     def __init__(self, port=None, baud=115200):
-        if not HAS_SERIAL:
-            raise ImportError("pyserial module is required.")
-        
         if port is None:
             ports = list(serial.tools.list_ports.comports())
             if not ports:
@@ -680,26 +670,66 @@ class RealRobotInterface:
                 pass
 
 
+class GeometryTrajectory:
+    @staticmethod
+    def circle(robot: RobotKinematics, radius, n_points):
+        """
+        Generate points on a circle in the YZ plane.
+        """
+        center = robot.get_home_pose()[:3,3] - np.array([0, 0, radius])
+        orientation = [0, pi, pi]
+        for i in range(n_points):
+            angle = 2 * np.pi * i / n_points
+            x = center[0]
+            y = center[1] + radius * np.cos(angle)
+            z = center[2] + radius * np.sin(angle)
+            planner.add_move(
+                position=np.array([x, y, z]),
+                euler_rpy=orientation,
+                v_max=0.1, a_max=0.5,
+                mode='continuous'
+            )
+    
+    @staticmethod
+    def rectangle(robot: RobotKinematics, width, height):
+        """
+        Generate rectangle waypoints.
+        """
+        start_pos = robot.get_home_pose()[:3,3]
+        positions = np.array([start_pos + np.array([0, -width/2, 0]),
+                         start_pos + np.array([0, -width/2, -height]),
+                         start_pos + np.array([0,  width/2, -height]),
+                         start_pos + np.array([0,  width/2, 0]),
+                         start_pos])
+        orientation = [0, pi, pi]
+        for pos in positions:
+            planner.add_move(
+                position=pos,
+                euler_rpy=orientation,
+                v_max=0.1, a_max=0.5,
+                mode='exact_stop'
+            )
+
+
 # --- Main Execution ---
 
 if __name__ == "__main__":
-    robot = RobotKinematics("3Dprinted", home_config=np.array([0.0, np.pi/2, 0.0, 0.0, -np.pi/2, 0.0]))
+    robot = RobotKinematics("3Dprinted", home_config=np.array([0.0, pi/2, 0.0, 0.0, -pi/2, 0.0]))
     planner = CNCPlanner()
     controller = CNCController(robot)
     
-    # 1. Define Trajectory (G-Code like commands)
     planner.add_move(
-        position=robot.get_home_pose()[:3, 3] + np.array([0.0, -0.05, 0.0]), 
-        euler_rpy=R.from_matrix(robot.get_home_pose()[:3, :3]).as_euler('xyz') + np.array([np.pi/4, 0, 0]),
+        position=np.array([0.187, 0, 0.03]),
+        euler_rpy=[0, pi, pi],
         v_max=0.1, a_max=0.5,
         mode='exact_stop'
     )
-    # planner.add_move(
-    #     position=np.array([0.15, -0.1, 0.3]), 
-    #     euler_rpy=[0, np.radians(20), 0], 
-    #     v_max=0.15, a_max=0.5,
-    #     mode='exact_stop'
-    # )
+    planner.add_move(
+        position=np.array([0.187, -0.05, 0.03]),
+        euler_rpy=[0, pi, pi],
+        v_max=0.1, a_max=0.5,
+        mode='exact_stop'
+    )
     
     # 2. Plan (Generate Segments)
     print("Generating CNC Path...")
@@ -735,22 +765,19 @@ if __name__ == "__main__":
     visualizer.animate_trajectory([q_traj[i] for i in range(len(q_traj))], desired_trajectory)
     
     # 5. Real Robot Execution
-    if HAS_SERIAL:
-        print("\n--- Real Robot Execution ---")
-        user_input = input("Connect to real robot and execute? (y/n): ")
-        if user_input.lower() == 'y':
-            try:
-                # Specify port if known, e.g., port='/dev/ttyUSB0'
-                rr = RealRobotInterface()
-                rr.wait_for_ready()
-                
-                # Verify Home Position
-                print("Note: Ensure robot is physically at HOME position before starting.")
-                # input("Press Enter to start streaming...") # Moved to inside stream_trajectory
-                
-                rr.stream_trajectory(q_traj, time_log, robot.home_config)
-                
-            except Exception as e:
-                print(f"Error executing on real robot: {e}")
-    else:
-        print("\nSkipping Real Robot execution (pyserial missing).")
+    print("\n--- Real Robot Execution ---")
+    user_input = input("Connect to real robot and execute? (y/n): ")
+    if user_input.lower() == 'y':
+        try:
+            # Specify port if known, e.g., port='/dev/ttyUSB0'
+            rr = RealRobotInterface()
+            rr.wait_for_ready()
+            
+            # Verify Home Position
+            print("Note: Ensure robot is physically at HOME position before starting.")
+            # input("Press Enter to start streaming...") # Moved to inside stream_trajectory
+            
+            rr.stream_trajectory(q_traj, time_log, robot.home_config)
+            
+        except Exception as e:
+            print(f"Error executing on real robot: {e}")
