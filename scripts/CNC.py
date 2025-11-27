@@ -474,14 +474,23 @@ class RealRobotInterface:
             if not ports:
                 raise Exception("No serial ports found!")
             print("Available ports:")
-            for p in ports:
-                print(f" - {p.device}")
-            port = ports[0].device
-            print(f"Selecting {port}")
+            for i, p in enumerate(ports):
+                print(f" {i}: {p.device}")
+            
+            if len(ports) == 1:
+                port = ports[0].device
+                print(f"Selecting {port}")
+            else:
+                try:
+                    choice = int(input(f"Select port (0-{len(ports)-1}): "))
+                    port = ports[choice].device
+                    print(f"Selected {port}")
+                except (ValueError, IndexError):
+                    port = ports[0].device
+                    print(f"Invalid selection, using {port}")
             
         self.ser = serial.Serial(port, baud, timeout=1)
         time.sleep(2) # Wait for Arduino reset
-        self.clear_buffer()
         print("Connected to Real Robot.")
         
         # Calibration Data (Steps per 90 degrees)
@@ -493,6 +502,7 @@ class RealRobotInterface:
         self.buffer_slots = self.BUFFER_SIZE
         
     def clear_buffer(self):
+        """Clear any remaining data in serial buffer"""
         self.ser.reset_input_buffer()
         while self.ser.in_waiting:
             self.ser.read()
@@ -511,14 +521,41 @@ class RealRobotInterface:
     def wait_for_ready(self):
         """Wait for Arduino to send READY string"""
         print("Waiting for Arduino...")
-        while True:
+        
+        # First, try to read any existing messages
+        start_time = time.time()
+        ready_received = False
+        
+        while time.time() - start_time < 5.0:  # 5 second timeout
             if self.ser.in_waiting:
-                line = self.ser.readline().decode().strip()
-                if "READY" in line:
-                    print("Arduino Ready.")
-                    break
-                print(f"Arduino: {line}")
+                try:
+                    line = self.ser.readline().decode().strip()
+                    print(f"Arduino: {line}")
+                    if "READY" in line:
+                        ready_received = True
+                        break
+                except:
+                    pass
             time.sleep(0.1)
+        
+        if not ready_received:
+            print("No READY message received, sending test command...")
+            # Send a test command to verify communication
+            self.ser.write(b"G28\n")  # Home command
+            time.sleep(0.5)
+            
+            # Check for OK response
+            if self.ser.in_waiting:
+                response = self.ser.readline().decode().strip()
+                print(f"Test response: {response}")
+                if "OK" in response:
+                    print("Arduino communication verified.")
+                else:
+                    print("Warning: Unexpected response from Arduino")
+            else:
+                print("Warning: No response from Arduino")
+        else:
+            print("Arduino Ready.")
 
     def stream_trajectory(self, q_traj: np.ndarray, time_traj: np.ndarray, start_q: np.ndarray):
         """
