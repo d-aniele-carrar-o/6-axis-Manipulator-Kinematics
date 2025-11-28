@@ -1,5 +1,6 @@
 src/mex_compiled_functions/*
 .vscode
+.venv
 .amazonq
 src/.vscode
 .DS_Store
@@ -11,3 +12,4 @@ src/.DS_Store
 *.json
 *.mp4
 *.pdf
+scripts/__pycache__
