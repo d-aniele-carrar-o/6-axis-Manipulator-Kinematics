@@ -26,7 +26,8 @@
 
   <link name="link_1" >
     <visual>
-        <origin rpy="0 0 0" xyz="0 0 0.0248"/>
+        <!-- <origin rpy="1.57079632675 0 0" xyz="0 0 0.0248" /> -->
+        <origin rpy="1.57079632675 0 0" xyz="0 0 0.0337" />
         <geometry name="link1">
           <mesh filename="robot_descriptions/printed_man_description/meshes/visual/link1.dae"/>
         </geometry>
@@ -117,7 +118,7 @@
   </link>
   
   <joint name="joint_6" type="revolute">
-    <origin rpy="1.57079632675 0 0" xyz="0 -0.0435 0"/>
+    <origin rpy="1.57079632675 0 0" xyz="0 -0.037 0"/>
     <parent link="link_5"/>
     <child  link="link_6"/>
     <axis   xyz="0 0 1"/>
@@ -126,7 +127,7 @@
 
   <link name="link_6" >
     <visual>
-        <origin rpy="0 0 0" xyz="0 0 0"/>
+        <origin rpy="0 0 0" xyz="0 0 -0.012"/>
         <geometry name="link6">
           <mesh filename="robot_descriptions/printed_man_description/meshes/visual/link6.dae"/>
         </geometry>

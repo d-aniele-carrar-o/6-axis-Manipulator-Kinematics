@@ -48,7 +48,7 @@ function parameters( level, robot_id )
     manipulator = robot_types(robot_id);
 
     % Use robot's urdf for visualization
-    real_robot = true;
+    real_robot = false;
 
     % Gripper presence depends on robot type
     gripper = (manipulator == "UR5" || manipulator == "custom");
@@ -102,7 +102,7 @@ function parameters( level, robot_id )
         %   i = |  0  |    1   |    2    |   3   |    4    |   5   |   6   |
         AL = [    0,       pi/2,        0,   pi/2,    -pi/2,   pi/2,   -0  ];
         A  = [    0,    0.03247,  0.14042,      0,        0,      0,   -0  ];
-        D  = [  -0 ,     0.0922,        0,      0,  0.15457,      0,   0.0435];
+        D  = [  -0 ,     0.0922,        0,      0,  0.15457,      0,   0.037];
         TH = [  -0 ,          0,        0,      0,        0,      0,      0];
         %  th = |  -  |   th1  |   th2   |  th3  |   th4   |  th5  |  th6  |
 

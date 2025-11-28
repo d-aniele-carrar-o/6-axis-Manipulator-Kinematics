@@ -8,11 +8,10 @@ parameters(0)
 % q0 = [0, -pi/6, -pi/2, -pi/3, -pi/2, 0.0]
 % q0 = [pi, -pi/2, 0, -pi/2, -pi/2, 0]
 % q0 = [pi/2, -2*pi/3, -2*pi/3, pi/2, -pi/2, 0]
-q0 = [pi,pi/2,0,0,-pi/4,0]
+q0 = [0,pi/2,0,0,-pi/4,0]
 
 % Compute end-effector pose
-[T_w_e, Te] = direct_kinematics( q0 )
-direct_kinematics_draw( robot, config, q0, NaN, true );
+[T_w_e, Te, handlesR] = direct_kinematics_draw( robot, config, q0, NaN, true );
 
 % Set true to test the solutions of IK
 test_IK = false;

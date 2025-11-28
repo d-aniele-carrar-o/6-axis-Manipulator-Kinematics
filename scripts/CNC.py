@@ -1,12 +1,10 @@
-import sys
 import time
 import serial
 import serial.tools.list_ports
 import numpy as np
 import matplotlib.pyplot as plt
 from typing import List, Tuple, Dict, Optional
-from scipy.spatial.transform import Rotation as R
-from scipy.spatial.transform import Slerp
+from scipy.spatial.transform import Slerp, Rotation as R
 from abc import ABC, abstractmethod
 from matplotlib.animation import FuncAnimation
 
@@ -15,7 +13,6 @@ from robot_kinematics import RobotKinematics
 
 
 # --- Modular Velocity Profile System ---
-
 class VelocityProfile(ABC):
     """Abstract base class for motion profiles."""
     @abstractmethod
@@ -81,7 +78,6 @@ class LSPBProfile(VelocityProfile):
 
 
 # --- CNC Interpolation & Planning ---
-
 class CartesianSegment:
     """
     Represents a single motion segment from P_start to P_end
@@ -182,7 +178,6 @@ class CartesianSegment:
         
         return T_curr, v_curr, False
 
-
 class CNCPlanner:
     """
     Simplified Path Planner.
@@ -222,7 +217,6 @@ class CNCPlanner:
             current_pose = target_pose
             
         return segments
-
 
 class CNCController:
     """
@@ -319,7 +313,6 @@ class CNCController:
 
 
 # --- Visualization ---
-
 class TrajectoryVisualizer:
     """Handles all visualization for robot trajectories."""
     
@@ -459,7 +452,6 @@ class TrajectoryVisualizer:
         return anim
 
 # --- Real Robot Interface ---
-
 class RealRobotInterface:
     def __init__(self, port=None, baud=115200):
         if port is None:
@@ -578,11 +570,7 @@ class RealRobotInterface:
         print(f"Start Step Error: {start_steps} (Should be all zeros)")
         if np.any(np.abs(start_steps) > 10):
             print("WARNING: Trajectory does not start at Home configuration!")
-            
-        if input("\nConfirm execution on REAL ROBOT? (y/n): ").lower() != 'y':
-            print("Aborted.")
-            return
-
+        
         print("Streaming trajectory to robot...")
         
         # INCREASED FREQUENCY for smoother motion
@@ -670,6 +658,7 @@ class RealRobotInterface:
                 pass
 
 
+# --- Simple Geometric Trajectories ---
 class GeometryTrajectory:
     @staticmethod
     def circle(robot: RobotKinematics, radius, n_points):
@@ -712,8 +701,7 @@ class GeometryTrajectory:
 
 
 # --- Main Execution ---
-
-if __name__ == "__main__":
+def main():
     robot = RobotKinematics("3Dprinted", home_config=np.array([0.0, pi/2, 0.0, 0.0, -pi/2, 0.0]))
     planner = CNCPlanner()
     controller = CNCController(robot)
@@ -742,8 +730,8 @@ if __name__ == "__main__":
     # 4. Visualization
     if len(time_log) == 0:
         print("Error: No trajectory generated.")
-        sys.exit(1)
-        
+        return
+    
     # Reconstruct Actual Path (Pose)
     p_act_log = []
     rpy_act_log = []
@@ -775,9 +763,12 @@ if __name__ == "__main__":
             
             # Verify Home Position
             print("Note: Ensure robot is physically at HOME position before starting.")
-            # input("Press Enter to start streaming...") # Moved to inside stream_trajectory
             
             rr.stream_trajectory(q_traj, time_log, robot.home_config)
             
         except Exception as e:
             print(f"Error executing on real robot: {e}")
+
+
+if __name__ == "__main__":
+    main()

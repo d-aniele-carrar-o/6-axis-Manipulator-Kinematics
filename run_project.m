@@ -32,13 +32,13 @@ addpath(fullfile(project_root, 'src', 'kinematics'));
 addpath(fullfile(project_root, 'src', 'mex_compiled_functions'));
 addpath(fullfile(project_root, 'src', 'plot_utils'));
 addpath(fullfile(project_root, 'src', 'pointcloud_processing'));
-addpath(fullfile(project_root, 'src', 'printed_man'));
 addpath(fullfile(project_root, 'src', 'robot_calibration'));
 addpath(fullfile(project_root, 'src', 'robot_descriptions'));
 addpath(fullfile(project_root, 'src', 'robot_urdf'));
 addpath(fullfile(project_root, 'src', 'trajectory_scripts'));
 addpath(fullfile(project_root, 'src', 'trajectory_transformation'));
 addpath(fullfile(project_root, 'src', 'utils'));
+addpath(fullfile(project_root, 'scripts'));
 % Change to src directory
 cd(fullfile(project_root, 'src'));
 
