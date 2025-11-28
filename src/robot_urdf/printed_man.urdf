@@ -4,8 +4,18 @@
 <!-- pi   = 3.14159265359 -->
 <!-- pi/2 = 1.57079632675 -->
 
-  <link name="base_link" />
-
+  <link name="base_link">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry name="link0">
+        <mesh filename="robot_descriptions/printed_man_description/meshes/visual/link0.dae"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.5 0.5 0.5 0.5"/>
+      </material>
+    </visual>
+  </link>
+  
   <joint name="joint_1" type="revolute">
     <origin rpy ="0 0 0" xyz="0 0 0" />
     <parent link="base_link"/>
@@ -14,7 +24,17 @@
     <limit effort="0" lower="-5" upper="5" velocity="3.14"/>
   </joint>
 
-  <link name="link_1" />
+  <link name="link_1" >
+    <visual>
+        <origin rpy="0 0 0" xyz="0 0 0.0248"/>
+        <geometry name="link1">
+          <mesh filename="robot_descriptions/printed_man_description/meshes/visual/link1.dae"/>
+        </geometry>
+        <material name="">
+          <color rgba="0.5 0.5 0.5 0.5"/>
+        </material>
+      </visual>
+  </link>
 
   <joint name="joint_2" type="revolute">
     <origin rpy="1.57079632675 0 0" xyz="0.03247 0 0.0922" />
@@ -24,7 +44,17 @@
     <limit effort="0" lower="-5" upper="5" velocity="3.14"/>
   </joint>
 
-  <link name="link_2" />
+  <link name="link_2" >
+    <visual>
+        <origin rpy="0 0 -1.57079632675" xyz="0 0 0.025"/>
+        <geometry name="link2">
+          <mesh filename="robot_descriptions/printed_man_description/meshes/visual/link2.dae"/>
+        </geometry>
+        <material name="">
+          <color rgba="0.5 0.5 0.5 0.5"/>
+        </material>
+      </visual>
+  </link>
 
   <joint name="joint_3" type="revolute">
     <origin rpy="0 0 0" xyz="0.14042 0 0"/>
@@ -34,7 +64,17 @@
     <limit effort="0" lower="-5" upper="5" velocity="3.14"/>
   </joint>
 
-  <link name="link_3" />
+  <link name="link_3" >
+    <visual>
+        <origin rpy="0 0 -1.57079632675" xyz="0 0 0.035"/>
+        <geometry name="link3">
+          <mesh filename="robot_descriptions/printed_man_description/meshes/visual/link3.dae"/>
+        </geometry>
+        <material name="">
+          <color rgba="0.5 0.5 0.5 0.5"/>
+        </material>
+      </visual>
+  </link>
   
   <joint name="joint_4" type="revolute">
     <origin rpy="1.57079632675 0 0" xyz="0 -0.15457 0"/>
@@ -44,7 +84,17 @@
     <limit effort="0" lower="-5" upper="5" velocity="3.14"/>
   </joint>
 
-  <link name="link_4" />
+  <link name="link_4" >
+    <visual>
+        <origin rpy="0 0 0" xyz="0 0 -0.146924"/>
+        <geometry name="link4">
+          <mesh filename="robot_descriptions/printed_man_description/meshes/visual/link4.dae"/>
+        </geometry>
+        <material name="">
+          <color rgba="0.5 0.5 0.5 0.5"/>
+        </material>
+      </visual>
+  </link>
 
   <joint name="joint_5" type="revolute">
     <origin rpy="-1.57079632675 0 0" xyz="0 0 0"/>
@@ -54,16 +104,36 @@
     <limit effort="0" lower="-5" upper="5" velocity="3.14"/>
   </joint>
 
-  <link name="link_5" />
+  <link name="link_5" >
+    <visual>
+        <origin rpy="0 0 0" xyz="0 0 0"/>
+        <geometry name="link5">
+          <mesh filename="robot_descriptions/printed_man_description/meshes/visual/link5.dae"/>
+        </geometry>
+        <material name="">
+          <color rgba="0.5 0.5 0.5 0.5"/>
+        </material>
+      </visual>
+  </link>
   
   <joint name="joint_6" type="revolute">
-    <origin rpy="1.57079632675 0 0" xyz="0 -0.07 0"/>
+    <origin rpy="1.57079632675 0 0" xyz="0 -0.0435 0"/>
     <parent link="link_5"/>
     <child  link="link_6"/>
     <axis   xyz="0 0 1"/>
     <limit effort="0" lower="-5" upper="5" velocity="3.14"/>
   </joint>
 
-  <link name="link_6" />
+  <link name="link_6" >
+    <visual>
+        <origin rpy="0 0 0" xyz="0 0 0"/>
+        <geometry name="link6">
+          <mesh filename="robot_descriptions/printed_man_description/meshes/visual/link6.dae"/>
+        </geometry>
+        <material name="">
+          <color rgba="0.5 0.5 0.5 0.5"/>
+        </material>
+      </visual>
+  </link>
     
 </robot>

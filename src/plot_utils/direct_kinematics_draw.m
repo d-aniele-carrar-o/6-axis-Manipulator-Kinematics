@@ -46,6 +46,7 @@ function [T_w_e, Te, handlesR] = direct_kinematics_draw( robot, config, q, handl
         ti = hgtransform( 'Parent', h, 'Matrix', eye(4) );
 
         for i=1:N
+            % i
             % Compute transformation matrix
             Ti  = transf_i_1_i_cpp( i-1, q(i), AL, A, D, TH );
             

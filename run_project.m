@@ -32,6 +32,7 @@ addpath(fullfile(project_root, 'src', 'kinematics'));
 addpath(fullfile(project_root, 'src', 'mex_compiled_functions'));
 addpath(fullfile(project_root, 'src', 'plot_utils'));
 addpath(fullfile(project_root, 'src', 'pointcloud_processing'));
+addpath(fullfile(project_root, 'src', 'printed_man'));
 addpath(fullfile(project_root, 'src', 'robot_calibration'));
 addpath(fullfile(project_root, 'src', 'robot_descriptions'));
 addpath(fullfile(project_root, 'src', 'robot_urdf'));
@@ -47,11 +48,19 @@ PROJECT_ROOT = project_root;
 
 clc; close all;
 
+% Set the default figure properties to change the background color
+set(0, 'DefaultFigureColor', 'w'); % Set default figure background to white
+set(0, 'DefaultAxesColor', 'w');   % Set default axes background to white
+set(0, 'DefaultAxesXColor', 'k');  % Set default x-axis color to black
+set(0, 'DefaultAxesYColor', 'k');  % Set default y-axis color to black
+set(0, 'DefaultAxesZColor', 'k');  % Set default z-axis color to black
+
 % Run the desired script ------------------------------------------------------
 % compile_cpp_code
-% testing_script;
-% dual_robot_setup_simple
+testing_script;
+% dual_robot_setup
 % test_augment_trajectory
 % simulate_recorded_motion
 % simulate_inference
-testing_tfs_3d
+% testing_tfs_3d
+% letter_writing;
