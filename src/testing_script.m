@@ -6,13 +6,12 @@ parameters(0)
 
 % Initial joint configuration
 % q0 = [0, -pi/6, -pi/2, -pi/3, -pi/2, 0.0]
-q0 = [pi, -pi/2, 0, -pi/2, -pi/2, 0]
+% q0 = [pi, -pi/2, 0, -pi/2, -pi/2, 0]
 % q0 = [pi/2, -2*pi/3, -2*pi/3, pi/2, -pi/2, 0]
-% q0 = [0,0,0,0,0,0]
+q0 = [0,pi/2,0,0,-pi/4,0]
 
 % Compute end-effector pose
-[T_w_e, Te] = direct_kinematics( q0 )
-direct_kinematics_draw( robot, config, q0, NaN, true );
+[T_w_e, Te, handlesR] = direct_kinematics_draw( robot, config, q0, NaN, true );
 
 % Set true to test the solutions of IK
 test_IK = false;
@@ -43,7 +42,7 @@ elseif manipulator == "custom"
     Rf    = eul2rotm_custom( phi_f );
     pf    = [0.2; 0.2; 0.06];
 elseif manipulator == "3Dprinted"
-    pf = Te(1:3,4) + [-0.05; 0; 0.0];
+    pf = Te(1:3,4) + [-0.1; 0.15; 0.0];
     Rf = Te(1:3,1:3);
 end
 Tf = [Rf, pf; 0,0,0,1];
@@ -87,7 +86,13 @@ times     = [t1];
 % Compute multi-viapoint trajectory for selected times and viapoints
 [t, p, v] = multipoint_trajectory( q0, viapoints, times );
 
+size(p)
+
 % Simulate trajectory
 [qf, handlesR] = simulate( robot, config, t, p, [], v, q0, NaN, false );
-Tf_f = direct_kinematics_cpp( qf, AL, A, D, TH )
-T_w_e_f = Trf_0 * Tf_f
+
+disp("Press enter to start real robot trajectory execution")
+pause()
+
+% Send to real robot
+send_to_robot(t, p);

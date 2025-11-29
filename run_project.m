@@ -38,6 +38,7 @@ addpath(fullfile(project_root, 'src', 'robot_urdf'));
 addpath(fullfile(project_root, 'src', 'trajectory_scripts'));
 addpath(fullfile(project_root, 'src', 'trajectory_transformation'));
 addpath(fullfile(project_root, 'src', 'utils'));
+addpath(fullfile(project_root, 'scripts'));
 % Change to src directory
 cd(fullfile(project_root, 'src'));
 
@@ -47,11 +48,19 @@ PROJECT_ROOT = project_root;
 
 clc; close all;
 
+% Set the default figure properties to change the background color
+set(0, 'DefaultFigureColor', 'w'); % Set default figure background to white
+set(0, 'DefaultAxesColor', 'w');   % Set default axes background to white
+set(0, 'DefaultAxesXColor', 'k');  % Set default x-axis color to black
+set(0, 'DefaultAxesYColor', 'k');  % Set default y-axis color to black
+set(0, 'DefaultAxesZColor', 'k');  % Set default z-axis color to black
+
 % Run the desired script ------------------------------------------------------
 % compile_cpp_code
-% testing_script;
-% dual_robot_setup_simple
+testing_script;
+% dual_robot_setup
 % test_augment_trajectory
 % simulate_recorded_motion
 % simulate_inference
-testing_tfs_3d
+% testing_tfs_3d
+% letter_writing;

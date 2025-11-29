@@ -20,7 +20,7 @@ function [T_w_e, Te, handlesR] = direct_kinematics_draw( robot, config, q, handl
             axs = handles(1);
         end
         handlesR(1) = axs;
-        xlim([-1,1]); ylim([-1,1]); zlim([-0.2,1.2]);
+        xlim([-0.4,0.4]); ylim([-0.4,0.4]); zlim([-0.05,0.45]);
         view(3); grid on;
         return
     end
@@ -31,7 +31,7 @@ function [T_w_e, Te, handlesR] = direct_kinematics_draw( robot, config, q, handl
     else
         axs = handles(1);
     end
-    xlim([-1,1]); ylim([-1,1]); zlim([-0.2,1.2]);
+    xlim([-0.4,0.4]); ylim([-0.4,0.4]); zlim([-0.05,0.45]);
     view(3); grid on;
 
     % Number of joint variables
@@ -46,6 +46,7 @@ function [T_w_e, Te, handlesR] = direct_kinematics_draw( robot, config, q, handl
         ti = hgtransform( 'Parent', h, 'Matrix', eye(4) );
 
         for i=1:N
+            % i
             % Compute transformation matrix
             Ti  = transf_i_1_i_cpp( i-1, q(i), AL, A, D, TH );
             
