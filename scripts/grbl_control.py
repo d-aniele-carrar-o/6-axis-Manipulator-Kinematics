@@ -19,6 +19,9 @@ from robot_kinematics import RobotKinematics
 
 class GrblRobotControl:
     HOME_CONFIG = np.array([0.0, np.pi/2, 0.0, 0.0, -np.pi/2, 0.0])
+    # J1, J2, J3, J4, J5 Signs for GRBL (1 = Normal, -1 = Inverted)
+    # Based on manual_control.py: J3 and J5 are inverted
+    AXIS_SIGNS = np.array([1.0, 1.0, -1.0, 1.0, -1.0])
 
     def __init__(self, port=None, baud=115200):
         self.lock = threading.Lock()
@@ -174,8 +177,12 @@ class GrblRobotControl:
         """Get current joint angles in Radians"""
         # GRBL MPos is Degrees relative to HOME
         # Use simulated mpos for now
-        q_deg_rel = self.simulated_mpos # Degrees
-        q_rad_rel = np.radians(q_deg_rel)
+        q_deg_grbl = self.simulated_mpos # Degrees in GRBL frame
+        
+        # Convert to Kinematic Frame (Apply Signs)
+        q_deg_kin = q_deg_grbl * self.AXIS_SIGNS
+        
+        q_rad_rel = np.radians(q_deg_kin)
         
         # Absolute DH Angles = Home Config + Relative Motion
         # Assumes GRBL 0,0,0,0,0 corresponds to HOME_CONFIG
@@ -193,10 +200,13 @@ class GrblRobotControl:
             
         axis = axis_chars[joint_idx-1]
         
+        # Apply Sign Inversion for GRBL
+        delta_grbl = delta_deg * self.AXIS_SIGNS[joint_idx-1]
+        
         # Just use Relative G-Code
         cmd_seq = [
             "G91", 
-            f"G1 {axis}{delta_deg} F{speed}",
+            f"G1 {axis}{delta_grbl:.3f} F{speed}",
             "G90"
         ]
         
@@ -207,8 +217,8 @@ class GrblRobotControl:
                 break
         
         if success:
-            self.simulated_mpos[joint_idx-1] += delta_deg
-            print(f"Moved J{joint_idx} by {delta_deg} deg")
+            self.simulated_mpos[joint_idx-1] += delta_grbl
+            print(f"Moved J{joint_idx} by {delta_deg} deg (GRBL: {delta_grbl:.3f})")
 
     def move_cartesian_rel(self, axis, val_mm, speed=1750):
         """Move task space relative (mm)"""
@@ -240,15 +250,18 @@ class GrblRobotControl:
         # q_abs = Home + q_rel
         # q_rel = q_abs - Home
         q_rad_rel = q_new_abs[:5] - self.HOME_CONFIG[:5]
-        q_deg_rel = np.degrees(q_rad_rel)
+        q_deg_rel_kin = np.degrees(q_rad_rel)
+        
+        # Apply Signs for GRBL
+        q_deg_rel_grbl = q_deg_rel_kin * self.AXIS_SIGNS
         
         print(f"DEBUG Absolute Angles: {np.degrees(q_new_abs[:5])}")
-        print(f"DEBUG Target GRBL (Deg): {q_deg_rel}")
+        print(f"DEBUG Target GRBL (Deg): {q_deg_rel_grbl}")
         
         # Send Absolute G1 command (G90 is default)
-        cmd = f"G1 X{q_deg_rel[0]:.3f} Y{q_deg_rel[1]:.3f} Z{q_deg_rel[2]:.3f} A{q_deg_rel[3]:.3f} B{q_deg_rel[4]:.3f} F{speed}"
+        cmd = f"G1 X{q_deg_rel_grbl[0]:.3f} Y{q_deg_rel_grbl[1]:.3f} Z{q_deg_rel_grbl[2]:.3f} A{q_deg_rel_grbl[3]:.3f} B{q_deg_rel_grbl[4]:.3f} F{speed}"
         if self.send_command(cmd):
-             self.simulated_mpos = q_deg_rel
+             self.simulated_mpos = q_deg_rel_grbl
              print(f"Moved to new position.")
         
     def stream_trajectory(self, q_traj_rad, time_traj):
@@ -270,7 +283,10 @@ class GrblRobotControl:
             
             # 2. Convert to GRBL Degrees (Relative to Home)
             q_rad_rel = q_rad_abs[:5] - self.HOME_CONFIG[:5]
-            q_deg_rel = np.degrees(q_rad_rel)
+            q_deg_rel_kin = np.degrees(q_rad_rel)
+            
+            # Apply Signs
+            q_deg_rel_grbl = q_deg_rel_kin * self.AXIS_SIGNS
             
             # 3. Calculate Feedrate (Speed)
             # F is deg/min.
@@ -280,10 +296,12 @@ class GrblRobotControl:
                 if dt < 1e-4: dt = 0.01
                 
                 # Next point for speed calc
-                q_next_rel = np.degrees(q_traj_rad[i+1][:5] - self.HOME_CONFIG[:5])
+                q_next_rad = q_traj_rad[i+1][:5] - self.HOME_CONFIG[:5]
+                q_next_kin = np.degrees(q_next_rad)
+                q_next_grbl = q_next_kin * self.AXIS_SIGNS
                 
                 # Max joint displacement
-                max_delta = np.max(np.abs(q_next_rel - q_deg_rel))
+                max_delta = np.max(np.abs(q_next_grbl - q_deg_rel_grbl))
                 
                 speed_deg_s = max_delta / dt
                 feedrate = speed_deg_s * 60.0 
@@ -294,7 +312,7 @@ class GrblRobotControl:
                 feedrate = 1000 # Last point
                 
             # 4. Construct G-Code
-            cmd = f"G1 X{q_deg_rel[0]:.3f} Y{q_deg_rel[1]:.3f} Z{q_deg_rel[2]:.3f} A{q_deg_rel[3]:.3f} B{q_deg_rel[4]:.3f} F{feedrate:.1f}"
+            cmd = f"G1 X{q_deg_rel_grbl[0]:.3f} Y{q_deg_rel_grbl[1]:.3f} Z{q_deg_rel_grbl[2]:.3f} A{q_deg_rel_grbl[3]:.3f} B{q_deg_rel_grbl[4]:.3f} F{feedrate:.1f}"
             
             # 5. Send
             # print(f"Point {i}/{total_points} F{feedrate:.0f}")
@@ -303,11 +321,13 @@ class GrblRobotControl:
                 return False
                 
             # Update internal state
-            self.simulated_mpos = q_deg_rel
+            self.simulated_mpos = q_deg_rel_grbl
             
         duration = time.time() - start_time
         print(f"Stream Complete. Took {duration:.2f}s for {time_traj[-1]:.2f}s trajectory.")
         return True
+
+    def interactive_mode(self):
         print("\n=== GRBL Robot Control ===")
         print("Joint Mode:     J<1-5> <+/-> <deg> [speed]")
         print("Cartesian Mode: <X/Y/Z> <+/-> <mm> [speed]")
