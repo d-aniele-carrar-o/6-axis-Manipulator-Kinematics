@@ -141,6 +141,22 @@ class GrblRobotControl:
                     
                     print(f"DEBUG RX: '{line}'")
                     
+                    # Handle Reset / Welcome Message
+                    if "Grbl" in line and "['$' for help]" in line:
+                         print("!!! WARNING: Arduino RESET detected !!!")
+                         # We must unlock
+                         time.sleep(0.1)
+                         self.ser.write(b"$X\n")
+                         continue
+
+                    # Handle Alarm Lock Error
+                    if line == "error:9":
+                        print("!!! Locked (error:9). Sending $X to unlock...")
+                        self.ser.write(b"$X\n")
+                        # We don't return False yet, we hope the next 'ok' is for the command or the unlock
+                        # But actually the original command is likely dead.
+                        return False
+
                     if line == "ok":
                         return True
                     if line.startswith("error"):
