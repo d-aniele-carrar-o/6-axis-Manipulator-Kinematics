@@ -6,7 +6,6 @@ Run Rectangle Trajectory on GRBL Robot
 import numpy as np
 import sys
 import os
-import time
 from numpy import pi
 
 # Imports
@@ -41,14 +40,14 @@ def run_rectangle_test():
     # 5. Up (Z+)
     # 6. Center (Home)
     
-    y_range = 0.05 # +/- 5cm
-    z_height = 0.05 # 5cm down
+    width = 0.05 # +/- 5cm
+    height = -0.15 # 5cm down
     
     p1 = start_pos
-    p2 = start_pos + np.array([0, y_range, 0])          # Left
-    p3 = start_pos + np.array([0, y_range, -z_height])  # Down
-    p4 = start_pos + np.array([0, -y_range, -z_height]) # Right across
-    p5 = start_pos + np.array([0, -y_range, 0])         # Up
+    p2 = start_pos + np.array([0, width, 0])          # Left
+    p3 = start_pos + np.array([0, width, height])  # Down
+    p4 = start_pos + np.array([0, -width, height]) # Right across
+    p5 = start_pos + np.array([0, -width, 0])         # Up
     p6 = start_pos                                      # Center
     
     # Orientation (Fixed Downward/Forward)
@@ -109,4 +108,3 @@ def run_rectangle_test():
 
 if __name__ == "__main__":
     run_rectangle_test()
-

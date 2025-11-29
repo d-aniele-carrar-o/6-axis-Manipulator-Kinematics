@@ -33,7 +33,7 @@ class RobotKinematics:
             return {
                 'AL': np.array([0, np.pi/2, 0, np.pi/2, -np.pi/2, np.pi/2, 0]),
                 'A':  np.array([0, 0.03247, 0.14042, 0, 0, 0, 0]),
-                'D':  np.array([0, 0.0922, 0, 0, 0.15457, 0, 0.07]),
+                'D':  np.array([0, 0.0922, 0, 0, 0.15457, 0, 0.037]),
                 'TH': np.array([0, 0, 0, 0, 0, 0, 0])
             }
         elif robot_type == "UR3e":

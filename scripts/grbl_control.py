@@ -21,7 +21,7 @@ class GrblRobotControl:
     HOME_CONFIG = np.array([0.0, np.pi/2, 0.0, 0.0, -np.pi/2, 0.0])
     # J1, J2, J3, J4, J5 Signs for GRBL (1 = Normal, -1 = Inverted)
     # Based on manual_control.py: J3 and J5 are inverted
-    AXIS_SIGNS = np.array([1.0, 1.0, -1.0, 1.0, -1.0])
+    AXIS_SIGNS = np.array([1.0, -1.0, -1.0, 1.0, -1.0])
 
     def __init__(self, port=None, baud=115200):
         self.lock = threading.Lock()
