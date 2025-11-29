@@ -184,7 +184,7 @@ class GrblRobotControl:
         
         return q_abs
 
-    def move_joints_rel(self, joint_idx, delta_deg, speed=3000):
+    def move_joints_rel(self, joint_idx, delta_deg, speed=1750):
         """Move specific joint by delta degrees"""
         axis_chars = ['X', 'Y', 'Z', 'A', 'B']
         if joint_idx < 1 or joint_idx > 5:
@@ -210,7 +210,7 @@ class GrblRobotControl:
             self.simulated_mpos[joint_idx-1] += delta_deg
             print(f"Moved J{joint_idx} by {delta_deg} deg")
 
-    def move_cartesian_rel(self, axis, val_mm, speed=3000):
+    def move_cartesian_rel(self, axis, val_mm, speed=1750):
         """Move task space relative (mm)"""
         # 1. Get current absolute DH angles
         q_curr = self.get_joint_angles()
@@ -356,7 +356,7 @@ class GrblRobotControl:
                 val = float(parts[2])
                 if direction == '-': val = -val
                 
-                speed = 3000
+                speed = 1750
                 if len(parts) > 3: speed = float(parts[3])
                 
                 self.move_joints_rel(joint, val, speed)
@@ -370,7 +370,7 @@ class GrblRobotControl:
                 val = float(parts[2])
                 if direction == '-': val = -val
                 
-                speed = 3000
+                speed = 1750
                 if len(parts) > 3: speed = float(parts[3])
                 
                 self.move_cartesian_rel(axis, val, speed)
