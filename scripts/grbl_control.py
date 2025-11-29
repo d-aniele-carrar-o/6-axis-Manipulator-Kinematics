@@ -34,9 +34,9 @@ class GrblRobotControl:
         
         # Start status poller
         self.running = True
-        self.poller = threading.Thread(target=self._status_loop)
-        self.poller.daemon = True
-        self.poller.start()
+        # self.poller = threading.Thread(target=self._status_loop)
+        # self.poller.daemon = True
+        # self.poller.start()
         
     def connect(self, port, baud):
         if port is None:
@@ -113,32 +113,42 @@ class GrblRobotControl:
     def send_command(self, cmd):
         print(f"DEBUG Sending: {cmd}")
         with self.lock:
-            # self.ser.flushInput() # Removed to prevent data loss
+            # self.ser.flushInput() # Removed
             self.ser.write((cmd + "\n").encode())
             
             start_t = time.time()
+            buffer = ""
             while True:
                 try:
-                    line = self.ser.readline().decode().strip()
-                except UnicodeDecodeError:
-                    print("DEBUG RX: <Decode Error>")
-                    continue
+                    # Read all available characters
+                    if self.ser.in_waiting > 0:
+                        chunk = self.ser.read(self.ser.in_waiting).decode(errors='ignore')
+                        buffer += chunk
+                    else:
+                        time.sleep(0.01)
+                except Exception as e:
+                    print(f"Serial Error: {e}")
+                
+                # Process buffer line by line
+                while '\n' in buffer:
+                    line, buffer = buffer.split('\n', 1)
+                    line = line.strip()
                     
-                if line:
+                    if not line: continue
+                    
                     print(f"DEBUG RX: '{line}'")
                     
-                if line == "ok":
-                    return True
-                if line.startswith("error"):
-                    print(f"GRBL Error: {line}")
-                    return False
-                # Handle Status Reports during command wait
-                if line.startswith('<'):
-                    self._parse_status(line)
+                    if line == "ok":
+                        return True
+                    if line.startswith("error"):
+                        print(f"GRBL Error: {line}")
+                        return False
+                    if line.startswith('<'):
+                        self._parse_status(line)
                 
-                # Timeout safety (e.g. 5 seconds for long moves)
+                # Timeout
                 if time.time() - start_t > 5.0:
-                    print("TIMEOUT waiting for 'ok'")
+                    print(f"TIMEOUT waiting for 'ok'. Buffer content: '{buffer}'")
                     return False
 
     def get_joint_angles(self):
