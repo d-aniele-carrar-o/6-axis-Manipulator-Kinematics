@@ -18,10 +18,8 @@ from CNC import CNCPlanner, CNCController
 class GrblRobotControl:
     HOME_CONFIG = np.array([0.0, np.pi/2, 0.0, 0.0, -np.pi/2, 0.0])
     # J1, J2, J3, J4, J5 Signs for SOFTWARE inversion
-    # NOTE: GRBL hardware already inverts J3(Z) and J5(B) via $3=20
-    # So we only need SOFTWARE inversion for J2 here (to fix task space)
-    # J3 and J5 are handled by hardware - don't double invert!
-    AXIS_SIGNS = np.array([1.0, -1.0, 1.0, 1.0, 1.0])
+    # J2, J3, J5 need software inversion based on user calibration
+    AXIS_SIGNS = np.array([1.0, -1.0, -1.0, 1.0, -1.0])
 
     def __init__(self, port=None, baud=115200, debug=True):
         self.debug = debug
@@ -173,19 +171,28 @@ class GrblRobotControl:
         # Apply Sign Inversion for GRBL
         delta_grbl = delta_deg * self.AXIS_SIGNS[joint_idx-1]
         
-        # Build G-code command
-        gcode = f"G91 G1 {axis}{delta_grbl:.3f} F{speed}"
+        # Calculate Absolute Target based on tracked position
+        # We use absolute moves to prevent accumulation of truncation errors
+        current_pos = self.simulated_mpos[joint_idx-1]
+        raw_target = current_pos + delta_grbl
+        
+        # Format exactly as it will be sent to ensure state consistency
+        target_str = f"{raw_target:.3f}"
+        target_val = float(target_str)
+        
+        # Build G-code command (Absolute Mode G90)
+        gcode = f"G90 G1 {axis}{target_str} F{speed}"
         print(f"J{joint_idx}: Sending '{gcode}'")
         
-        # Send combined command (G91 sets relative mode for this line only in grbl)
+        # Send command
         success = self.send_command(gcode)
         
-        # Always restore absolute mode
+        # Always restore absolute mode (though we used it)
         self.send_command("G90")
         
         if success:
-            self.simulated_mpos[joint_idx-1] += delta_grbl
-            print(f"  -> OK: J{joint_idx} moved by {delta_deg} deg")
+            self.simulated_mpos[joint_idx-1] = target_val
+            print(f"  -> OK: J{joint_idx} moved by {delta_deg} deg (Target: {target_val})")
         else:
             print(f"  -> FAILED: J{joint_idx} command not executed!")
 
@@ -297,15 +304,19 @@ class GrblRobotControl:
                 feedrate = 1000 # Last point
                 
             # 4. Construct G-Code
-            cmd = f"G1 X{q_deg_rel_grbl[0]:.3f} Y{q_deg_rel_grbl[1]:.3f} Z{q_deg_rel_grbl[2]:.3f} A{q_deg_rel_grbl[3]:.3f} B{q_deg_rel_grbl[4]:.3f} F{feedrate:.1f}"
+            # Format values to match GRBL resolution exactly
+            coords = [f"{v:.3f}" for v in q_deg_rel_grbl]
+            target_vals = np.array([float(c) for c in coords])
+            
+            cmd = f"G1 X{coords[0]} Y{coords[1]} Z{coords[2]} A{coords[3]} B{coords[4]} F{feedrate:.1f}"
             
             # 5. Send
             if not self.send_command(cmd):
                 print(f"Stream Failed at point {i}")
                 return False
                 
-            # Update internal state
-            self.simulated_mpos = q_deg_rel_grbl
+            # Update internal state to match exact sent values
+            self.simulated_mpos = target_vals
             
         duration = time.time() - start_time
         print(f"Stream Complete. Took {duration:.2f}s for {time_traj[-1]:.2f}s trajectory.")
