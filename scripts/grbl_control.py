@@ -9,6 +9,7 @@ import serial.tools.list_ports
 import time
 import numpy as np
 import threading
+import sys
 from scipy.spatial.transform import Rotation as R
 
 from robot_kinematics import RobotKinematics
@@ -214,10 +215,18 @@ class GrblRobotControl:
         
         # 5. Plan and Execute
         print("Generating Linear Trajectory...")
-        segments = planner.plan(T_curr, dt=0.04) # 25Hz
+        segments = planner.plan(T_curr, dt=0.02) # Finer dt
+        
+        # Fresh Controller
+        controller = CNCController(self.kinematics)
         
         # Run Control Loop (Differential IK)
-        results = self.controller.execute(segments, q_curr)
+        try:
+            results = controller.execute(segments, q_curr)
+        except KeyboardInterrupt:
+            print("Generation cancelled.")
+            return
+
         time_log, q_traj = results[0], results[1]
         
         print(f"Trajectory Size: {len(q_traj)} points. Duration: {time_log[-1]:.2f}s")
@@ -237,6 +246,10 @@ class GrblRobotControl:
         start_time = time.time()
         
         for i in range(total_points):
+            if i % 10 == 0:
+                sys.stdout.write(f"Streaming {i}/{total_points}...\r")
+                sys.stdout.flush()
+
             q_rad_abs = q_traj_rad[i]
             
             # 2. Convert to GRBL Degrees (Relative to Home)
