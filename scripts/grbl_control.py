@@ -74,7 +74,8 @@ class GrblRobotControl:
                 # Polling frequency
                 time.sleep(0.1)
                 
-                with self.lock:
+                # Check if lock is free - don't block if main thread is sending
+                if self.lock.acquire(blocking=False):
                     try:
                         self.ser.write(b"?")
                         # Read immediately
@@ -90,6 +91,8 @@ class GrblRobotControl:
                                 break
                     except:
                         pass
+                    finally:
+                        self.lock.release()
 
     def _parse_status(self, line):
         # Example: <Idle|MPos:0.000,0.000,0.000,0.000,0.000|FS:0,0>
@@ -116,6 +119,7 @@ class GrblRobotControl:
             start_t = time.time()
             while True:
                 line = self.ser.readline().decode().strip()
+                # print(f"DEBUG RX: {line}") # Uncomment for deep debugging
                 if line == "ok":
                     return True
                 if line.startswith("error"):
@@ -125,8 +129,8 @@ class GrblRobotControl:
                 if line.startswith('<'):
                     self._parse_status(line)
                 
-                # Timeout safety (e.g. 2 seconds for ack)
-                if time.time() - start_t > 2.0:
+                # Timeout safety (e.g. 5 seconds for long moves)
+                if time.time() - start_t > 5.0:
                     print("TIMEOUT waiting for 'ok'")
                     return False
 
