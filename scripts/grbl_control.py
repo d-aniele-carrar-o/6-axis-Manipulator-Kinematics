@@ -8,14 +8,11 @@ import serial
 import serial.tools.list_ports
 import time
 import numpy as np
-import sys
-import os
 import threading
-import re
+from scipy.spatial.transform import Rotation as R
 
-# Ensure we can import RobotKinematics
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from robot_kinematics import RobotKinematics
+from CNC import CNCPlanner, CNCController
 
 class GrblRobotControl:
     HOME_CONFIG = np.array([0.0, np.pi/2, 0.0, 0.0, -np.pi/2, 0.0])
@@ -30,6 +27,9 @@ class GrblRobotControl:
         # Kinematics
         self.kinematics = RobotKinematics("3Dprinted")
         
+        # CNC Controller for Trajectory Generation
+        self.controller = CNCController(self.kinematics)
+        
         # State
         self.status = "Unknown"
         self.mpos = np.zeros(5) # Machine Position in DEGREES
@@ -40,9 +40,6 @@ class GrblRobotControl:
         
         # Start status poller
         self.running = True
-        # self.poller = threading.Thread(target=self._status_loop)
-        # self.poller.daemon = True
-        # self.poller.start()
         
     def connect(self, port, baud):
         if port is None:
@@ -74,59 +71,15 @@ class GrblRobotControl:
         # Unlock if alarm
         self.send_command("$X")
 
-    def _status_loop(self):
-        while self.running:
-            if self.ser.is_open:
-                # Polling frequency
-                time.sleep(0.1)
-                
-                # Check if lock is free - don't block if main thread is sending
-                if self.lock.acquire(blocking=False):
-                    try:
-                        self.ser.write(b"?")
-                        # Read immediately
-                        while True:
-                            line = self.ser.readline().decode().strip()
-                            if line.startswith('<'):
-                                self._parse_status(line)
-                                break
-                            elif line == 'ok':
-                                # Unexpected ok? ignore
-                                pass
-                            elif not line:
-                                break
-                    except:
-                        pass
-                    finally:
-                        self.lock.release()
-
-    def _parse_status(self, line):
-        # Example: <Idle|MPos:0.000,0.000,0.000,0.000,0.000|FS:0,0>
-        try:
-            content = line.strip('<>').split('|')
-            self.status = content[0]
-            
-            for field in content[1:]:
-                if field.startswith('MPos:'):
-                    coords = field[5:].split(',')
-                    self.mpos = np.array([float(c) for c in coords])
-                elif field.startswith('WPos:'):
-                    coords = field[5:].split(',')
-                    self.wpos = np.array([float(c) for c in coords])
-        except Exception as e:
-            pass
-
     def send_command(self, cmd):
-        print(f"DEBUG Sending: {cmd}")
+        # print(f"DEBUG Sending: {cmd}")
         with self.lock:
-            # self.ser.flushInput() # Removed
             self.ser.write((cmd + "\n").encode())
             
             start_t = time.time()
             buffer = ""
             while True:
                 try:
-                    # Read all available characters
                     if self.ser.in_waiting > 0:
                         chunk = self.ser.read(self.ser.in_waiting).decode(errors='ignore')
                         buffer += chunk
@@ -135,29 +88,22 @@ class GrblRobotControl:
                 except Exception as e:
                     print(f"Serial Error: {e}")
                 
-                # Process buffer line by line
                 while '\n' in buffer:
                     line, buffer = buffer.split('\n', 1)
                     line = line.strip()
                     
                     if not line: continue
+                    # print(f"DEBUG RX: '{line}'")
                     
-                    print(f"DEBUG RX: '{line}'")
-                    
-                    # Handle Reset / Welcome Message
                     if "Grbl" in line and "['$' for help]" in line:
                          print("!!! WARNING: Arduino RESET detected !!!")
-                         # We must unlock
                          time.sleep(0.1)
                          self.ser.write(b"$X\n")
                          continue
 
-                    # Handle Alarm Lock Error
                     if line == "error:9":
                         print("!!! Locked (error:9). Sending $X to unlock...")
                         self.ser.write(b"$X\n")
-                        # We don't return False yet, we hope the next 'ok' is for the command or the unlock
-                        # But actually the original command is likely dead.
                         return False
 
                     if line == "ok":
@@ -168,24 +114,31 @@ class GrblRobotControl:
                     if line.startswith('<'):
                         self._parse_status(line)
                 
-                # Timeout
                 if time.time() - start_t > 5.0:
                     print(f"TIMEOUT waiting for 'ok'. Buffer content: '{buffer}'")
                     return False
 
+    def _parse_status(self, line):
+        try:
+            content = line.strip('<>').split('|')
+            self.status = content[0]
+            for field in content[1:]:
+                if field.startswith('MPos:'):
+                    coords = field[5:].split(',')
+                    self.mpos = np.array([float(c) for c in coords])
+        except Exception as e:
+            pass
+
     def get_joint_angles(self):
         """Get current joint angles in Radians"""
         # GRBL MPos is Degrees relative to HOME
-        # Use simulated mpos for now
         q_deg_grbl = self.simulated_mpos # Degrees in GRBL frame
         
         # Convert to Kinematic Frame (Apply Signs)
         q_deg_kin = q_deg_grbl * self.AXIS_SIGNS
-        
         q_rad_rel = np.radians(q_deg_kin)
         
         # Absolute DH Angles = Home Config + Relative Motion
-        # Assumes GRBL 0,0,0,0,0 corresponds to HOME_CONFIG
         q_abs = self.HOME_CONFIG.copy()
         q_abs[:5] += q_rad_rel
         
@@ -203,7 +156,6 @@ class GrblRobotControl:
         # Apply Sign Inversion for GRBL
         delta_grbl = delta_deg * self.AXIS_SIGNS[joint_idx-1]
         
-        # Just use Relative G-Code
         cmd_seq = [
             "G91", 
             f"G1 {axis}{delta_grbl:.3f} F{speed}",
@@ -221,7 +173,9 @@ class GrblRobotControl:
             print(f"Moved J{joint_idx} by {delta_deg} deg (GRBL: {delta_grbl:.3f})")
 
     def move_cartesian_rel(self, axis, val_mm, speed=1750):
-        """Move task space relative (mm)"""
+        """
+        Move task space relative (mm) using CNC Planner for straight line trajectory.
+        """
         # 1. Get current absolute DH angles
         q_curr = self.get_joint_angles()
         
@@ -233,48 +187,52 @@ class GrblRobotControl:
         idx = {'X':0, 'Y':1, 'Z':2}[axis]
         T_target[idx, 3] += (val_mm / 1000.0) # mm -> m
         
-        print(f"Moving {axis} by {val_mm}mm")
+        print(f"Moving {axis} by {val_mm}mm (Linear Interpolated)")
         print(f"Current Pos: {T_curr[:3, 3]}")
         print(f"Target Pos:  {T_target[:3, 3]}")
         
-        # 4. IK for Target Pose (Absolute Angles)
-        q_new_abs, success = self.kinematics.numerical_inverse_kinematics(
-            q_curr, T_target, max_iter=100
+        # 4. Use CNC Planner to generate straight line trajectory
+        planner = CNCPlanner()
+        
+        # Convert Speed: GRBL F is deg/min (approx). We need m/s.
+        # This is tricky because we are mixing units. 
+        # User provides 'speed' likely in GRBL units (1750).
+        # Let's assume a slow safe Cartesian speed.
+        v_cartesian = 0.02 # 20mm/s
+        a_cartesian = 0.1  # 100mm/s^2
+        
+        # Current Orientation (Preserve)
+        rpy_curr = R.from_matrix(T_curr[:3, :3]).as_euler('xyz')
+        
+        planner.add_move(
+            position=T_target[:3, 3],
+            euler_rpy=rpy_curr,
+            v_max=v_cartesian,
+            a_max=a_cartesian,
+            mode='exact_stop'
         )
         
-        if not success:
-            print("IK Failed!")
-            return
-            
-        # 5. Convert Absolute DH Angles -> GRBL Target (Degrees rel to Home)
-        # q_abs = Home + q_rel
-        # q_rel = q_abs - Home
-        q_rad_rel = q_new_abs[:5] - self.HOME_CONFIG[:5]
-        q_deg_rel_kin = np.degrees(q_rad_rel)
+        # 5. Plan and Execute
+        print("Generating Linear Trajectory...")
+        segments = planner.plan(T_curr, dt=0.04) # 25Hz
         
-        # Apply Signs for GRBL
-        q_deg_rel_grbl = q_deg_rel_kin * self.AXIS_SIGNS
+        # Run Control Loop (Differential IK)
+        results = self.controller.execute(segments, q_curr)
+        time_log, q_traj = results[0], results[1]
         
-        print(f"DEBUG Absolute Angles: {np.degrees(q_new_abs[:5])}")
-        print(f"DEBUG Target GRBL (Deg): {q_deg_rel_grbl}")
+        print(f"Trajectory Size: {len(q_traj)} points. Duration: {time_log[-1]:.2f}s")
         
-        # Send Absolute G1 command (G90 is default)
-        cmd = f"G1 X{q_deg_rel_grbl[0]:.3f} Y{q_deg_rel_grbl[1]:.3f} Z{q_deg_rel_grbl[2]:.3f} A{q_deg_rel_grbl[3]:.3f} B{q_deg_rel_grbl[4]:.3f} F{speed}"
-        if self.send_command(cmd):
-             self.simulated_mpos = q_deg_rel_grbl
-             print(f"Moved to new position.")
-        
+        # 6. Stream to Robot
+        self.stream_trajectory(q_traj, time_log)
+
     def stream_trajectory(self, q_traj_rad, time_traj):
         """
         Stream a full trajectory (list of joint angles in radians) to GRBL.
         Uses Call-Response flow control.
         """
+        if len(q_traj_rad) == 0: return True
+        
         print(f"Starting Stream. Points: {len(q_traj_rad)}")
-        
-        # 1. Check Start Position
-        # q_traj_rad[0] should match current position roughly
-        # But we assume the planner handled continuity.
-        
         total_points = len(q_traj_rad)
         start_time = time.time()
         
@@ -290,7 +248,6 @@ class GrblRobotControl:
             
             # 3. Calculate Feedrate (Speed)
             # F is deg/min.
-            # We need look-ahead or dt. 
             if i < total_points - 1:
                 dt = time_traj[i+1] - time_traj[i]
                 if dt < 1e-4: dt = 0.01
@@ -306,7 +263,6 @@ class GrblRobotControl:
                 speed_deg_s = max_delta / dt
                 feedrate = speed_deg_s * 60.0 
                 
-                # Min feedrate clamp
                 if feedrate < 10: feedrate = 10
             else:
                 feedrate = 1000 # Last point
@@ -315,7 +271,6 @@ class GrblRobotControl:
             cmd = f"G1 X{q_deg_rel_grbl[0]:.3f} Y{q_deg_rel_grbl[1]:.3f} Z{q_deg_rel_grbl[2]:.3f} A{q_deg_rel_grbl[3]:.3f} B{q_deg_rel_grbl[4]:.3f} F{feedrate:.1f}"
             
             # 5. Send
-            # print(f"Point {i}/{total_points} F{feedrate:.0f}")
             if not self.send_command(cmd):
                 print(f"Stream Failed at point {i}")
                 return False
@@ -343,14 +298,12 @@ class GrblRobotControl:
                     print("Setting Home (G92)...")
                     if self.send_command("G92 X0 Y0 Z0 A0 B0"):
                         self.simulated_mpos = np.zeros(5)
-                    # Also reset internal state if needed, but polling updates it
                 elif cmd == 'S':
                     print(f"Status: {self.status}")
                     print(f"Simulated MPos (Deg): {self.simulated_mpos}")
                     q = self.get_joint_angles()
                     T, _ = self.kinematics.forward_kinematics(q)
                     print(f"CPos (m):   {T[:3, 3]}")
-                    print(f"Home Config: {np.degrees(self.HOME_CONFIG)}")
                 elif cmd:
                     self.parse_command(cmd)
             except KeyboardInterrupt:
@@ -366,7 +319,6 @@ class GrblRobotControl:
     def parse_command(self, cmd):
         parts = cmd.split()
         if not parts: return
-        
         first = parts[0]
         
         if first.startswith('J'):
@@ -375,10 +327,8 @@ class GrblRobotControl:
                 direction = parts[1]
                 val = float(parts[2])
                 if direction == '-': val = -val
-                
                 speed = 1750
                 if len(parts) > 3: speed = float(parts[3])
-                
                 self.move_joints_rel(joint, val, speed)
             except:
                 print("Invalid Joint Cmd")
@@ -389,10 +339,8 @@ class GrblRobotControl:
                 direction = parts[1]
                 val = float(parts[2])
                 if direction == '-': val = -val
-                
                 speed = 1750
                 if len(parts) > 3: speed = float(parts[3])
-                
                 self.move_cartesian_rel(axis, val, speed)
             except:
                 print("Invalid Cart Cmd")
