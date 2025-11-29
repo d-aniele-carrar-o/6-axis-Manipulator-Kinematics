@@ -113,13 +113,20 @@ class GrblRobotControl:
     def send_command(self, cmd):
         print(f"DEBUG Sending: {cmd}")
         with self.lock:
-            self.ser.flushInput() # Clear junk
+            # self.ser.flushInput() # Removed to prevent data loss
             self.ser.write((cmd + "\n").encode())
             
             start_t = time.time()
             while True:
-                line = self.ser.readline().decode().strip()
-                # print(f"DEBUG RX: {line}") # Uncomment for deep debugging
+                try:
+                    line = self.ser.readline().decode().strip()
+                except UnicodeDecodeError:
+                    print("DEBUG RX: <Decode Error>")
+                    continue
+                    
+                if line:
+                    print(f"DEBUG RX: '{line}'")
+                    
                 if line == "ok":
                     return True
                 if line.startswith("error"):
