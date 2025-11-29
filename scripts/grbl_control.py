@@ -18,6 +18,8 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from robot_kinematics import RobotKinematics
 
 class GrblRobotControl:
+    HOME_CONFIG = np.array([0.0, np.pi/2, 0.0, 0.0, -np.pi/2, 0.0])
+
     def __init__(self, port=None, baud=115200):
         self.lock = threading.Lock()
         self.connect(port, baud)
@@ -69,23 +71,28 @@ class GrblRobotControl:
     def _status_loop(self):
         while self.running:
             if self.ser.is_open:
+                # Polling frequency
+                time.sleep(0.1)
+                
                 with self.lock:
                     try:
                         self.ser.write(b"?")
+                        # Read immediately
                         while True:
                             line = self.ser.readline().decode().strip()
                             if line.startswith('<'):
                                 self._parse_status(line)
                                 break
-                            if not line:
+                            elif line == 'ok':
+                                # Unexpected ok? ignore
+                                pass
+                            elif not line:
                                 break
                     except:
                         pass
-            time.sleep(0.1)
 
     def _parse_status(self, line):
         # Example: <Idle|MPos:0.000,0.000,0.000,0.000,0.000|FS:0,0>
-        # Or: <Idle|MPos:0.000,0.000,0.000,0.000,0.000|Bf:15,128|FS:0,0>
         try:
             content = line.strip('<>').split('|')
             self.status = content[0]
@@ -98,13 +105,15 @@ class GrblRobotControl:
                     coords = field[5:].split(',')
                     self.wpos = np.array([float(c) for c in coords])
         except Exception as e:
-            # print(f"Parse error: {e}")
             pass
 
     def send_command(self, cmd):
         print(f"DEBUG Sending: {cmd}")
         with self.lock:
+            self.ser.flushInput() # Clear junk
             self.ser.write((cmd + "\n").encode())
+            
+            start_t = time.time()
             while True:
                 line = self.ser.readline().decode().strip()
                 if line == "ok":
@@ -112,25 +121,30 @@ class GrblRobotControl:
                 if line.startswith("error"):
                     print(f"GRBL Error: {line}")
                     return False
-                # Ignore status reports in command stream
+                # Handle Status Reports during command wait
                 if line.startswith('<'):
                     self._parse_status(line)
+                
+                # Timeout safety (e.g. 2 seconds for ack)
+                if time.time() - start_t > 2.0:
+                    print("TIMEOUT waiting for 'ok'")
+                    return False
 
     def get_joint_angles(self):
         """Get current joint angles in Radians"""
-        # GRBL is configured in Degrees
-        # MPos contains [X, Y, Z, A, B] in Degrees
+        # GRBL MPos is Degrees relative to HOME
+        q_deg_rel = self.mpos # Degrees
+        q_rad_rel = np.radians(q_deg_rel)
         
-        # Convert Deg -> Rad
-        q_deg = self.mpos
-        q_rad = np.radians(q_deg)
+        # Absolute DH Angles = Home Config + Relative Motion
+        # Assumes GRBL 0,0,0,0,0 corresponds to HOME_CONFIG
+        q_abs = self.HOME_CONFIG.copy()
+        q_abs[:5] += q_rad_rel
         
-        # Add J6 (0.0) as GRBL only controls 5 axes
-        return np.concatenate([q_rad, [0.0]])
+        return q_abs
 
     def move_joints_rel(self, joint_idx, delta_deg, speed=3000):
         """Move specific joint by delta degrees"""
-        # GRBL uses G91 for relative mode
         axis_chars = ['X', 'Y', 'Z', 'A', 'B']
         if joint_idx < 1 or joint_idx > 5:
             print("Invalid joint")
@@ -138,10 +152,11 @@ class GrblRobotControl:
             
         axis = axis_chars[joint_idx-1]
         
+        # Just use Relative G-Code
         cmd_seq = [
-            "G91", # Relative
+            "G91", 
             f"G1 {axis}{delta_deg} F{speed}",
-            "G90"  # Back to Absolute
+            "G90"
         ]
         
         for cmd in cmd_seq:
@@ -151,11 +166,13 @@ class GrblRobotControl:
 
     def move_cartesian_rel(self, axis, val_mm, speed=3000):
         """Move task space relative (mm)"""
-        # 1. Get current pose
+        # 1. Get current absolute DH angles
         q_curr = self.get_joint_angles()
+        
+        # 2. Get current Pose
         T_curr, _ = self.kinematics.forward_kinematics(q_curr)
         
-        # 2. Target Pose
+        # 3. Target Pose
         T_target = T_curr.copy()
         idx = {'X':0, 'Y':1, 'Z':2}[axis]
         T_target[idx, 3] += (val_mm / 1000.0) # mm -> m
@@ -164,8 +181,8 @@ class GrblRobotControl:
         print(f"Current Pos: {T_curr[:3, 3]}")
         print(f"Target Pos:  {T_target[:3, 3]}")
         
-        # 3. IK
-        q_new, success = self.kinematics.numerical_inverse_kinematics(
+        # 4. IK for Target Pose (Absolute Angles)
+        q_new_abs, success = self.kinematics.numerical_inverse_kinematics(
             q_curr, T_target, max_iter=100
         )
         
@@ -173,13 +190,17 @@ class GrblRobotControl:
             print("IK Failed!")
             return
             
-        # 4. Move
-        # Convert Rad -> Deg
-        q_deg = np.degrees(q_new[:5])
+        # 5. Convert Absolute DH Angles -> GRBL Target (Degrees rel to Home)
+        # q_abs = Home + q_rel
+        # q_rel = q_abs - Home
+        q_rad_rel = q_new_abs[:5] - self.HOME_CONFIG[:5]
+        q_deg_rel = np.degrees(q_rad_rel)
         
-        print(f"DEBUG IK Result (deg): {q_deg}")
+        print(f"DEBUG Absolute Angles: {np.degrees(q_new_abs[:5])}")
+        print(f"DEBUG Target GRBL (Deg): {q_deg_rel}")
         
-        cmd = f"G1 X{q_deg[0]:.3f} Y{q_deg[1]:.3f} Z{q_deg[2]:.3f} A{q_deg[3]:.3f} B{q_deg[4]:.3f} F{speed}"
+        # Send Absolute G1 command (G90 is default)
+        cmd = f"G1 X{q_deg_rel[0]:.3f} Y{q_deg_rel[1]:.3f} Z{q_deg_rel[2]:.3f} A{q_deg_rel[3]:.3f} B{q_deg_rel[4]:.3f} F{speed}"
         self.send_command(cmd)
         
     def interactive_mode(self):
@@ -197,18 +218,22 @@ class GrblRobotControl:
                 elif cmd == 'H':
                     print("Setting Home (G92)...")
                     self.send_command("G92 X0 Y0 Z0 A0 B0")
+                    # Also reset internal state if needed, but polling updates it
                 elif cmd == 'S':
                     print(f"Status: {self.status}")
                     print(f"MPos (Deg): {self.mpos}")
                     q = self.get_joint_angles()
                     T, _ = self.kinematics.forward_kinematics(q)
                     print(f"CPos (m):   {T[:3, 3]}")
+                    print(f"Home Config: {np.degrees(self.HOME_CONFIG)}")
                 elif cmd:
                     self.parse_command(cmd)
             except KeyboardInterrupt:
                 break
             except Exception as e:
                 print(f"Error: {e}")
+                import traceback
+                traceback.print_exc()
                 
         self.running = False
         self.ser.close()
@@ -253,4 +278,3 @@ if __name__ == "__main__":
         robot.interactive_mode()
     except Exception as e:
         print(f"Failed: {e}")
-
