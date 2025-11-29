@@ -251,7 +251,63 @@ class GrblRobotControl:
              self.simulated_mpos = q_deg_rel
              print(f"Moved to new position.")
         
-    def interactive_mode(self):
+    def stream_trajectory(self, q_traj_rad, time_traj):
+        """
+        Stream a full trajectory (list of joint angles in radians) to GRBL.
+        Uses Call-Response flow control.
+        """
+        print(f"Starting Stream. Points: {len(q_traj_rad)}")
+        
+        # 1. Check Start Position
+        # q_traj_rad[0] should match current position roughly
+        # But we assume the planner handled continuity.
+        
+        total_points = len(q_traj_rad)
+        start_time = time.time()
+        
+        for i in range(total_points):
+            q_rad_abs = q_traj_rad[i]
+            
+            # 2. Convert to GRBL Degrees (Relative to Home)
+            q_rad_rel = q_rad_abs[:5] - self.HOME_CONFIG[:5]
+            q_deg_rel = np.degrees(q_rad_rel)
+            
+            # 3. Calculate Feedrate (Speed)
+            # F is deg/min.
+            # We need look-ahead or dt. 
+            if i < total_points - 1:
+                dt = time_traj[i+1] - time_traj[i]
+                if dt < 1e-4: dt = 0.01
+                
+                # Next point for speed calc
+                q_next_rel = np.degrees(q_traj_rad[i+1][:5] - self.HOME_CONFIG[:5])
+                
+                # Max joint displacement
+                max_delta = np.max(np.abs(q_next_rel - q_deg_rel))
+                
+                speed_deg_s = max_delta / dt
+                feedrate = speed_deg_s * 60.0 
+                
+                # Min feedrate clamp
+                if feedrate < 10: feedrate = 10
+            else:
+                feedrate = 1000 # Last point
+                
+            # 4. Construct G-Code
+            cmd = f"G1 X{q_deg_rel[0]:.3f} Y{q_deg_rel[1]:.3f} Z{q_deg_rel[2]:.3f} A{q_deg_rel[3]:.3f} B{q_deg_rel[4]:.3f} F{feedrate:.1f}"
+            
+            # 5. Send
+            # print(f"Point {i}/{total_points} F{feedrate:.0f}")
+            if not self.send_command(cmd):
+                print(f"Stream Failed at point {i}")
+                return False
+                
+            # Update internal state
+            self.simulated_mpos = q_deg_rel
+            
+        duration = time.time() - start_time
+        print(f"Stream Complete. Took {duration:.2f}s for {time_traj[-1]:.2f}s trajectory.")
+        return True
         print("\n=== GRBL Robot Control ===")
         print("Joint Mode:     J<1-5> <+/-> <deg> [speed]")
         print("Cartesian Mode: <X/Y/Z> <+/-> <mm> [speed]")
