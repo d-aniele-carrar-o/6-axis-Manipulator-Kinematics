@@ -29,40 +29,39 @@ def run_rectangle_test():
     start_pos = T_home[:3, 3]
     print(f"Home Position: {start_pos}")
     
-    # Define a small 5x5cm rectangle in YZ plane
-    width = 0.05
-    height = 0.05
+    # Define a larger rectangle in YZ plane
+    # Center approx at (0.187, 0, 0.162)
+    # Go +/- 5cm in Y
     
-    # Corner Points (relative to start)
-    # 1. Start (Top-Left)
-    # 2. Down
-    # 3. Right
-    # 4. Up
-    # 5. Back to Start
+    # Define Corners relative to Start Position (Home)
+    # 1. Start (Home)
+    # 2. Left (Y+)
+    # 3. Down (Z-)
+    # 4. Right (Y-)
+    # 5. Up (Z+)
+    # 6. Center (Home)
+    
+    y_range = 0.05 # +/- 5cm
+    z_height = 0.05 # 5cm down
     
     p1 = start_pos
-    p2 = start_pos + np.array([0, 0, -height])
-    p3 = start_pos + np.array([0, -width, -height])
-    p4 = start_pos + np.array([0, -width, 0])
-    p5 = start_pos
+    p2 = start_pos + np.array([0, y_range, 0])          # Left
+    p3 = start_pos + np.array([0, y_range, -z_height])  # Down
+    p4 = start_pos + np.array([0, -y_range, -z_height]) # Right across
+    p5 = start_pos + np.array([0, -y_range, 0])         # Up
+    p6 = start_pos                                      # Center
     
     # Orientation (Fixed Downward/Forward)
-    # Home orientation is approx: [0, pi, pi]?? Let's check.
-    # Actually, let's keep orientation fixed to whatever Home is.
-    # We can extract R from T_home
     R_home = T_home[:3, :3]
-    # We can pass matrix directly to planner if we modify it, 
-    # but CNCPlanner expects Euler.
-    # Let's assume we want to keep R_home.
-    # SciPy Euler conversion
     from scipy.spatial.transform import Rotation as R
     rpy_home = R.from_matrix(R_home).as_euler('xyz')
     
     # Add moves
-    speed = 0.02 # m/s (20mm/s) - Very Slow/Safe
-    accel = 0.1  # m/s^2
+    speed = 0.02 # m/s (20mm/s)
+    accel = 0.05  # m/s^2 - Reduced accel
     
-    points = [p2, p3, p4, p5]
+    # Explicitly add Start point first to ensure controller starts correctly
+    points = [p2, p3, p4, p5, p6]
     
     for p in points:
         planner.add_move(
@@ -70,13 +69,13 @@ def run_rectangle_test():
             euler_rpy=rpy_home,
             v_max=speed, 
             a_max=accel,
-            mode='exact_stop' # Stop at corners for safety
+            mode='exact_stop'
         )
         
     # 3. Generate Path
     print("Generating Path...")
-    # dt=0.05s (20Hz) -> Good for serial streaming reliability
-    segments = planner.plan(T_home, dt=0.05) 
+    # Using dt=0.04s (25Hz) - Fine enough for linearity
+    segments = planner.plan(T_home, dt=0.04) 
     
     # 4. Interpolate (Controller simulation)
     # We use CNCController just to generate the q_trajectory list
