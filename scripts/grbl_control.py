@@ -19,6 +19,7 @@ from robot_kinematics import RobotKinematics
 
 class GrblRobotControl:
     def __init__(self, port=None, baud=115200):
+        self.lock = threading.Lock()
         self.connect(port, baud)
         
         # Kinematics
@@ -68,17 +69,18 @@ class GrblRobotControl:
     def _status_loop(self):
         while self.running:
             if self.ser.is_open:
-                try:
-                    self.ser.write(b"?")
-                    while True:
-                        line = self.ser.readline().decode().strip()
-                        if line.startswith('<'):
-                            self._parse_status(line)
-                            break
-                        if not line:
-                            break
-                except:
-                    pass
+                with self.lock:
+                    try:
+                        self.ser.write(b"?")
+                        while True:
+                            line = self.ser.readline().decode().strip()
+                            if line.startswith('<'):
+                                self._parse_status(line)
+                                break
+                            if not line:
+                                break
+                    except:
+                        pass
             time.sleep(0.1)
 
     def _parse_status(self, line):
@@ -100,18 +102,19 @@ class GrblRobotControl:
             pass
 
     def send_command(self, cmd):
-        # print(f"Sending: {cmd}")
-        self.ser.write((cmd + "\n").encode())
-        while True:
-            line = self.ser.readline().decode().strip()
-            if line == "ok":
-                return True
-            if line.startswith("error"):
-                print(f"GRBL Error: {line}")
-                return False
-            # Ignore status reports in command stream
-            if line.startswith('<'):
-                self._parse_status(line)
+        print(f"DEBUG Sending: {cmd}")
+        with self.lock:
+            self.ser.write((cmd + "\n").encode())
+            while True:
+                line = self.ser.readline().decode().strip()
+                if line == "ok":
+                    return True
+                if line.startswith("error"):
+                    print(f"GRBL Error: {line}")
+                    return False
+                # Ignore status reports in command stream
+                if line.startswith('<'):
+                    self._parse_status(line)
 
     def get_joint_angles(self):
         """Get current joint angles in Radians"""
@@ -173,6 +176,8 @@ class GrblRobotControl:
         # 4. Move
         # Convert Rad -> Deg
         q_deg = np.degrees(q_new[:5])
+        
+        print(f"DEBUG IK Result (deg): {q_deg}")
         
         cmd = f"G1 X{q_deg[0]:.3f} Y{q_deg[1]:.3f} Z{q_deg[2]:.3f} A{q_deg[3]:.3f} B{q_deg[4]:.3f} F{speed}"
         self.send_command(cmd)
