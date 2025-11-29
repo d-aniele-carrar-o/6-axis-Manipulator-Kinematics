@@ -161,6 +161,11 @@ class LetterWriter:
             # Advance Cursor
             current_y -= 1.2 * scale
 
+        # Return to Home Pose
+        print("Adding return to Home...")
+        home_pos = T_home[:3, 3]
+        self.planner.add_move(home_pos, rpy_home, v_rapid, accel, 'exact_stop')
+
     def execute(self):
         # 1. Plan Trajectory (Differential IK)
         # Start from Robot Home Config
