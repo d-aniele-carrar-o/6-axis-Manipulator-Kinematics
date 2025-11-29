@@ -17,11 +17,14 @@ from CNC import CNCPlanner, CNCController
 
 class GrblRobotControl:
     HOME_CONFIG = np.array([0.0, np.pi/2, 0.0, 0.0, -np.pi/2, 0.0])
-    # J1, J2, J3, J4, J5 Signs for GRBL (1 = Normal, -1 = Inverted)
-    # Based on manual_control.py: J3 and J5 are inverted
-    AXIS_SIGNS = np.array([1.0, -1.0, -1.0, 1.0, -1.0])
+    # J1, J2, J3, J4, J5 Signs for SOFTWARE inversion
+    # NOTE: GRBL hardware already inverts J3(Z) and J5(B) via $3=20
+    # So we only need SOFTWARE inversion for J2 here (to fix task space)
+    # J3 and J5 are handled by hardware - don't double invert!
+    AXIS_SIGNS = np.array([1.0, -1.0, 1.0, 1.0, 1.0])
 
-    def __init__(self, port=None, baud=115200):
+    def __init__(self, port=None, baud=115200, debug=True):
+        self.debug = debug
         self.lock = threading.Lock()
         self.connect(port, baud)
         
@@ -73,7 +76,8 @@ class GrblRobotControl:
         self.send_command("$X")
 
     def send_command(self, cmd):
-        # print(f"DEBUG Sending: {cmd}")
+        if self.debug:
+            print(f"  TX: {cmd}")
         with self.lock:
             self.ser.write((cmd + "\n").encode())
             
@@ -94,7 +98,8 @@ class GrblRobotControl:
                     line = line.strip()
                     
                     if not line: continue
-                    # print(f"DEBUG RX: '{line}'")
+                    if self.debug:
+                        print(f"  RX: {line}")
                     
                     if "Grbl" in line and "['$' for help]" in line:
                          print("!!! WARNING: Arduino RESET detected !!!")
@@ -110,13 +115,13 @@ class GrblRobotControl:
                     if line == "ok":
                         return True
                     if line.startswith("error"):
-                        print(f"GRBL Error: {line}")
+                        print(f"GRBL Error: {line} (for cmd: {cmd})")
                         return False
                     if line.startswith('<'):
                         self._parse_status(line)
                 
                 if time.time() - start_t > 5.0:
-                    print(f"TIMEOUT waiting for 'ok'. Buffer content: '{buffer}'")
+                    print(f"TIMEOUT waiting for 'ok'. Buffer: '{buffer}'")
                     return False
 
     def _parse_status(self, line):
@@ -129,6 +134,17 @@ class GrblRobotControl:
                     self.mpos = np.array([float(c) for c in coords])
         except Exception as e:
             pass
+
+    def query_settings(self):
+        """Query and display GRBL settings"""
+        with self.lock:
+            self.ser.write(b"$$\n")
+            time.sleep(0.5)
+            
+            while self.ser.in_waiting:
+                line = self.ser.readline().decode(errors='ignore').strip()
+                if line:
+                    print(f"  {line}")
 
     def get_joint_angles(self):
         """Get current joint angles in Radians"""
@@ -149,7 +165,7 @@ class GrblRobotControl:
         """Move specific joint by delta degrees"""
         axis_chars = ['X', 'Y', 'Z', 'A', 'B']
         if joint_idx < 1 or joint_idx > 5:
-            print("Invalid joint")
+            print("Invalid joint (use 1-5)")
             return
             
         axis = axis_chars[joint_idx-1]
@@ -157,21 +173,21 @@ class GrblRobotControl:
         # Apply Sign Inversion for GRBL
         delta_grbl = delta_deg * self.AXIS_SIGNS[joint_idx-1]
         
-        cmd_seq = [
-            "G91", 
-            f"G1 {axis}{delta_grbl:.3f} F{speed}",
-            "G90"
-        ]
+        # Build G-code command
+        gcode = f"G91 G1 {axis}{delta_grbl:.3f} F{speed}"
+        print(f"J{joint_idx}: Sending '{gcode}'")
         
-        success = True
-        for cmd in cmd_seq:
-            if not self.send_command(cmd):
-                success = False
-                break
+        # Send combined command (G91 sets relative mode for this line only in grbl)
+        success = self.send_command(gcode)
+        
+        # Always restore absolute mode
+        self.send_command("G90")
         
         if success:
             self.simulated_mpos[joint_idx-1] += delta_grbl
-            print(f"Moved J{joint_idx} by {delta_deg} deg (GRBL: {delta_grbl:.3f})")
+            print(f"  -> OK: J{joint_idx} moved by {delta_deg} deg")
+        else:
+            print(f"  -> FAILED: J{joint_idx} command not executed!")
 
     def move_cartesian_rel(self, axis, val_mm, speed=1750):
         """
@@ -299,7 +315,10 @@ class GrblRobotControl:
         print("\n=== GRBL Robot Control ===")
         print("Joint Mode:     J<1-5> <+/-> <deg> [speed]")
         print("Cartesian Mode: <X/Y/Z> <+/-> <mm> [speed]")
-        print("Commands: h=set home, s=status, q=quit")
+        print("Commands: h=set home, s=status, d=toggle debug, q=quit")
+        print(f"AXIS_SIGNS (software): {self.AXIS_SIGNS}")
+        print(f"  J1->X, J2->Y, J3->Z, J4->A, J5->B")
+        print(f"  (Hardware inverts Z,B via $3=20)")
         
         while True:
             try:
@@ -307,6 +326,9 @@ class GrblRobotControl:
                 
                 if cmd == 'Q':
                     break
+                elif cmd == 'D':
+                    self.debug = not self.debug
+                    print(f"Debug mode: {'ON' if self.debug else 'OFF'}")
                 elif cmd == 'H':
                     print("Setting Home (G92)...")
                     if self.send_command("G92 X0 Y0 Z0 A0 B0"):
@@ -317,6 +339,10 @@ class GrblRobotControl:
                     q = self.get_joint_angles()
                     T, _ = self.kinematics.forward_kinematics(q)
                     print(f"CPos (m):   {T[:3, 3]}")
+                elif cmd == '$$':
+                    # Query GRBL settings
+                    print("Querying GRBL settings...")
+                    self.query_settings()
                 elif cmd:
                     self.parse_command(cmd)
             except KeyboardInterrupt:
