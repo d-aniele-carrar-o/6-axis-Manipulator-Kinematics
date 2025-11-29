@@ -32,6 +32,9 @@ class GrblRobotControl:
         self.mpos = np.zeros(5) # Machine Position in DEGREES
         self.wpos = np.zeros(5) # Work Position in DEGREES
         
+        # Internal tracking since polling is disabled/flaky
+        self.simulated_mpos = np.zeros(5) 
+        
         # Start status poller
         self.running = True
         # self.poller = threading.Thread(target=self._status_loop)
@@ -154,7 +157,8 @@ class GrblRobotControl:
     def get_joint_angles(self):
         """Get current joint angles in Radians"""
         # GRBL MPos is Degrees relative to HOME
-        q_deg_rel = self.mpos # Degrees
+        # Use simulated mpos for now
+        q_deg_rel = self.simulated_mpos # Degrees
         q_rad_rel = np.radians(q_deg_rel)
         
         # Absolute DH Angles = Home Config + Relative Motion
@@ -180,10 +184,15 @@ class GrblRobotControl:
             "G90"
         ]
         
+        success = True
         for cmd in cmd_seq:
-            self.send_command(cmd)
-            
-        print(f"Moved J{joint_idx} by {delta_deg} deg")
+            if not self.send_command(cmd):
+                success = False
+                break
+        
+        if success:
+            self.simulated_mpos[joint_idx-1] += delta_deg
+            print(f"Moved J{joint_idx} by {delta_deg} deg")
 
     def move_cartesian_rel(self, axis, val_mm, speed=3000):
         """Move task space relative (mm)"""
@@ -222,7 +231,9 @@ class GrblRobotControl:
         
         # Send Absolute G1 command (G90 is default)
         cmd = f"G1 X{q_deg_rel[0]:.3f} Y{q_deg_rel[1]:.3f} Z{q_deg_rel[2]:.3f} A{q_deg_rel[3]:.3f} B{q_deg_rel[4]:.3f} F{speed}"
-        self.send_command(cmd)
+        if self.send_command(cmd):
+             self.simulated_mpos = q_deg_rel
+             print(f"Moved to new position.")
         
     def interactive_mode(self):
         print("\n=== GRBL Robot Control ===")
@@ -238,11 +249,12 @@ class GrblRobotControl:
                     break
                 elif cmd == 'H':
                     print("Setting Home (G92)...")
-                    self.send_command("G92 X0 Y0 Z0 A0 B0")
+                    if self.send_command("G92 X0 Y0 Z0 A0 B0"):
+                        self.simulated_mpos = np.zeros(5)
                     # Also reset internal state if needed, but polling updates it
                 elif cmd == 'S':
                     print(f"Status: {self.status}")
-                    print(f"MPos (Deg): {self.mpos}")
+                    print(f"Simulated MPos (Deg): {self.simulated_mpos}")
                     q = self.get_joint_angles()
                     T, _ = self.kinematics.forward_kinematics(q)
                     print(f"CPos (m):   {T[:3, 3]}")
