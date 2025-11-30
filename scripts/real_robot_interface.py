@@ -22,7 +22,7 @@ class GrblRobotControl:
     # J2, J3, J5 need software inversion based on user calibration
     AXIS_SIGNS = np.array([1.0, -1.0, -1.0, 1.0, -1.0])
 
-    def __init__(self, port=None, baud=115200, debug=True):
+    def __init__(self, port=None, baud=115200, debug=False):
         self.debug = debug
         self.lock = threading.Lock()
         self.connect(port, baud)

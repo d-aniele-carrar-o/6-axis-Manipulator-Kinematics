@@ -76,7 +76,7 @@ function [qf, handlesR] = simulate( robot, config, time, positions, gripper_posi
             show( robot, config, "Visuals", "on", "Frames", "on", "FastUpdate", true, "PreservePlot", false, "Parent", axs ); hold on;
         end
 
-        xlim([-1,1]); ylim([-1,1]); zlim([0,1.2]);
+        xlim([-0.4,0.4]); ylim([-0.4,0.4]); zlim([-0.05,0.45]);
         view(3); grid on;
         
         % Pre-allocate trajectory points storage

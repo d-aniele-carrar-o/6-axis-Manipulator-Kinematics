@@ -32,18 +32,28 @@ trajectory:
     a_start: 0.0
     a_end: 0.0
 
-target:
-  # Desired End-Effector Pose
-  position: [0.1, 0.1, 0.25]   # [x, y, z] in meters
-  orientation: [0.0, $pi, $pi] # [roll, pitch, yaw] in radians (ZYX Euler)
+targets:
+  # List of waypoints/via-points for the trajectory
+  # Each target defines position, orientation, and motion parameters
+  - position: [0.1, 0.1, 0.25]     # [x, y, z] in meters
+    orientation: [0.0, $pi, $pi]    # [roll, pitch, yaw] in radians (ZYX Euler)
+    mode: "exact_stop"              # "exact_stop" or "continuous"
+    
+  - position: [0.15, 0.05, 0.3]   # Second waypoint
+    orientation: [0.0, $pi, $pi/2]
+    mode: "exact_stop"
+    
+  - position: [0.05, 0.15, 0.2]   # Third waypoint
+    orientation: [0.0, $pi, 0.0]
+    mode: "exact_stop"
 
 visualization:
   animate: true
   plot_analysis: true
   frame_scale: 0.05
   animation_interval: 20 # ms
-  speedup: 2 # Frame skipping factor (1=all frames, 5=every 5th frame)
+  speedup: 5 # Frame skipping factor (1=all frames, 5=every 5th frame)
 
 real_robot:
-  execute: false                 # Set to true to execute on real robot
+  execute: true                 # Set to true to execute on real robot
   port: /dev/cu.usbserial-1420   # Set port or null for auto-select

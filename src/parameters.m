@@ -25,7 +25,7 @@ function parameters( level, robot_id )
     kinematics = "IK";
     % ["IK", "IDK"]
 
-    traj_type  = "cubic";
+    traj_type  = "LSPB";
     % ["LSPB", "cubic", "quintic"]
     
     if kinematics == "IDK"
@@ -38,7 +38,7 @@ function parameters( level, robot_id )
     end
     
     % Plot parameters
-    plot_grahps = false;
+    plot_grahps = true;
     % ---------------------------------------------------------------------------------------------
 
     robot_types = ["3Dprinted", "UR3e"];  % each option can be ["ABB", "UR5", "UR3e", "custom"]
@@ -48,7 +48,7 @@ function parameters( level, robot_id )
     manipulator = robot_types(robot_id);
 
     % Use robot's urdf for visualization
-    real_robot = false;
+    real_robot = true;
 
     % Gripper presence depends on robot type
     gripper = (manipulator == "UR5" || manipulator == "custom");

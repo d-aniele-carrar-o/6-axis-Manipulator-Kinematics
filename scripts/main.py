@@ -10,7 +10,7 @@ visualizes the result, and optionally executes it on the real robot.
 import numpy as np
 import os
 import yaml
-from typing import Dict
+from typing import Any
 
 from robot_kinematics import RobotKinematics
 from CNC import CNCPlanner, CNCController
@@ -18,7 +18,7 @@ from trajectory_visualizer import TrajectoryVisualizer
 from real_robot_interface import GrblRobotControl
 
 
-def load_config(config_path: str = "config.yaml") -> Dict:
+def load_config(config_path: str = "config.yaml") -> Any:
     """Load configuration from YAML file."""
     # Get the directory where main.py is located
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -58,9 +58,8 @@ def main():
     # Extract parameters
     robot_name = config['robot']['name']
     
-    # Target
-    end_pos = np.array(config['target']['position'])
-    end_euler = config['target']['orientation']
+    # Targets
+    targets = config['targets']
     
     # Trajectory Settings
     traj_config = config['trajectory']
@@ -72,7 +71,7 @@ def main():
     
     print(f"--- Configuration Loaded ---")
     print(f"Robot: {robot_name}")
-    print(f"Target: Pos={end_pos}, Euler={end_euler}")
+    print(f"Targets: {len(targets)} waypoints")
     print(f"Trajectory: dt={dt}s")
     print(f"Profile Limits: v_max={v_max}, a_max={a_max}")
     print(f"----------------------------")
@@ -85,19 +84,21 @@ def main():
     print(f"Robot home configuration: {np.rad2deg(robot.home_config)} deg")
     
     # 3. Plan Path
-    # Add move from Config
-    # Note: CNCPlanner assumes we start from current pose (which is home initially)
-    # The first segment will go from Home -> Target
-    planner.add_move(
-        position=end_pos,
-        euler_rpy=end_euler,
-        v_max=v_max, 
-        a_max=a_max,
-        mode='exact_stop'
-    )
-    
-    # You can add more moves here if needed, e.g.:
-    # planner.add_move(position=..., euler_rpy=...)
+    # Add all moves from config
+    for i, target in enumerate(targets):
+        position = np.array(target['position'])
+        orientation = target['orientation']
+        mode = target.get('mode', 'exact_stop')
+        
+        print(f"Adding waypoint {i+1}: Pos={position}, Euler={orientation}, Mode={mode}")
+        
+        planner.add_move(
+            position=position,
+            euler_rpy=orientation,
+            v_max=v_max, 
+            a_max=a_max,
+            mode=mode
+        )
 
     print("Generating CNC Path...")
     start_T, _ = robot.forward_kinematics()

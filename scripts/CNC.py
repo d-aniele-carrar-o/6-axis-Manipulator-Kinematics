@@ -1,5 +1,5 @@
 import numpy as np
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 from scipy.spatial.transform import Slerp, Rotation as R
 from numpy import pi
 
@@ -43,7 +43,7 @@ class CartesianSegment:
         self.slerp = Slerp([0, 1], self.key_rots)
         
         # 2. Velocity Profile Generation (Time Law)
-        # For simplicity in this CNC, we assume there is linear motion or we use angle as "distance"
+        # Use the dominant motion (linear or angular) for the time law
         
         if self.linear_dist < 1e-6:
             # Pure rotation or no motion
@@ -54,7 +54,7 @@ class CartesianSegment:
             self.is_pure_rotation = False
             
         self.profile = LSPBProfile()
-        self.times, self.s, self.s_dot = self.profile.generate(motion_mag, v_max, a_max, dt)
+        self.times, self.s, self.s_dot, _ = self.profile.generate(float(motion_mag), v_max, a_max, dt)
         
     def get_state(self, index: int) -> Tuple[np.ndarray, np.ndarray, bool]:
         """
@@ -76,26 +76,30 @@ class CartesianSegment:
         if self.is_pure_rotation:
             p_curr = self.p_start
             v_lin = np.zeros(3)
-            u_dot = s_dot / motion_len if motion_len > 1e-6 else 0
         else:
             # Use clamped u to prevent overshoot beyond P_end
             p_curr = self.p_start + self.direction * (u * motion_len)
             v_lin = self.direction * s_dot
-            u_dot = s_dot / motion_len
             
         # Interpolate Orientation (SLERP)
         r_curr = self.slerp(u)
         
         # Calculate Angular Velocity
-        # Angular velocity vector w such that R_dot = w x R
-        # For Slerp/Geodesic: w = axis_of_rotation * angle_rate
-        # The axis of rotation (global) is fixed for a geodesic between two orientations.
-        # It is exactly the axis of R_diff = R_end * R_start^T
-        # The total angle is |rot_vec_total|. 
-        # The current angle is theta(t) = total_angle * u(t)
-        # So theta_dot = total_angle * u_dot
-        
-        w_vec = self.rot_vec_total * u_dot
+        # For mixed motion: scale angular velocity by the same profile
+        # Angular velocity = rotation_axis * angular_speed
+        if self.total_angle > 1e-6:
+            if self.is_pure_rotation:
+                # Pure rotation: use s_dot directly as angular speed
+                angular_speed = s_dot
+            else:
+                # Mixed motion: scale angular motion by linear velocity profile
+                angular_speed = s_dot * (self.total_angle / self.linear_dist)
+            
+            # Normalize rotation vector to get axis, then scale by speed
+            rotation_axis = self.rot_vec_total / self.total_angle
+            w_vec = rotation_axis * angular_speed
+        else:
+            w_vec = np.zeros(3)
         
         # Construct Result
         T_curr = np.eye(4)
@@ -154,19 +158,19 @@ class CNCController:
     def __init__(self, robot: RobotKinematics):
         self.robot = robot
         
-    def execute(self, segments: List[CartesianSegment], start_q: np.ndarray = None) -> Tuple:
+    def execute(self, segments: List[CartesianSegment], start_q: Optional[np.ndarray] = None) -> Tuple:
         """
         Run the control loop.
         """
-        # Initial Desired State (from start of first segment)
-        T0 = segments[0].start_pose.copy()
+        # Get initial state from first segment
+        T0, vd0, _ = segments[0].get_state(0)
         
         # Initialize logs with STARTING state (t=0)
         time_log = [0.0]
         q_log = [self.robot.home_config if start_q is None else start_q.copy()]
         q_dot_log = [np.zeros(6)]
         Td_log = [T0]
-        vd_log = [np.zeros(6)]
+        vd_log = [vd0]
         v_act_log = [np.zeros(6)]
         
         segment_indices = []
@@ -179,7 +183,7 @@ class CNCController:
         for i, segment in enumerate(segments):
             print(f"  > Block {i+1}: Dist={segment.linear_dist:.3f}m, Planned Time={segment.times[-1]:.2f}s")
             
-            idx = 0
+            idx = 1
             while True:
                 # 1. Get Setpoint (Interpolator)
                 Td, vd, is_done_profile = segment.get_state(idx)

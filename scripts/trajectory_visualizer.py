@@ -193,6 +193,8 @@ class TrajectoryVisualizer:
             ax.text2D(0.05, 0.95, f"Error: {err_val*1000:.1f} mm", 
                      transform=ax.transAxes,
                      bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
+            
+            return []
         
         anim = FuncAnimation(fig, update, frames=len(q_display), 
                            interval=self.animation_interval, repeat=True)
