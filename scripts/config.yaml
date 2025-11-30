@@ -1,0 +1,48 @@
+# Configuration file for Trajectory Generation and Simulation
+
+robot:
+  name: "3Dprinted"  # Options: "3Dprinted", "UR3e"
+  3Dprinted:
+    home_config: [0.0, $pi/2, 0.0, 0.0, -$pi/2, 0.0]
+  UR3e:
+    home_config: [0.0, $pi/2, 0.0, 0.0, -$pi/2, 0.0]
+
+trajectory:
+  # General settings
+  dt: 0.02    # Time step in seconds
+  
+  # Trajectory Interpolation Settings
+  # Path is generated in Cartesian space (Straight line for position, SLERP for orientation)
+  
+  # IK Method: "differential" (recommended), "numerical"
+  ik_method: "differential"
+  
+  # Velocity Profile Settings (Timing along the path)
+  velocity_profile:
+    type: "lspb" # Options: "cubic", "quintic", "lspb", "linear"
+    
+    # Constraints for LSPB (Trapezoidal)
+    max_velocity: 0.1        # m/s or rad/s
+    max_acceleration: 0.5    # m/s^2 or rad/s^2
+    
+    # Boundary conditions for polynomial profiles
+    # Default is zero velocity/acceleration at start/end
+    v_start: 0.0
+    v_end: 0.0
+    a_start: 0.0
+    a_end: 0.0
+
+target:
+  # Desired End-Effector Pose
+  position: [0.1, 0.1, 0.25]   # [x, y, z] in meters
+  orientation: [0.0, $pi, $pi] # [roll, pitch, yaw] in radians (ZYX Euler)
+
+visualization:
+  animate: true
+  plot_analysis: true
+  frame_scale: 0.05
+  animation_interval: 100 # ms
+
+real_robot:
+  execute: false                 # Set to true to execute on real robot
+  port: /dev/cu.usbserial-1420   # Set port or null for auto-select

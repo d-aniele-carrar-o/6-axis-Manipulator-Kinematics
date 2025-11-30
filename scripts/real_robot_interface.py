@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GRBL Robot Control
+Real Robot Control Interface
 Control 6-axis robot using GRBL firmware (grbl-Mega-5X).
 """
 
@@ -14,6 +14,7 @@ from scipy.spatial.transform import Rotation as R
 
 from robot_kinematics import RobotKinematics
 from CNC import CNCPlanner, CNCController
+
 
 class GrblRobotControl:
     HOME_CONFIG = np.array([0.0, np.pi/2, 0.0, 0.0, -np.pi/2, 0.0])
@@ -395,9 +396,12 @@ class GrblRobotControl:
             except:
                 print("Invalid Cart Cmd")
 
+
 if __name__ == "__main__":
     try:
         robot = GrblRobotControl()
         robot.interactive_mode()
     except Exception as e:
         print(f"Failed: {e}")
+
+

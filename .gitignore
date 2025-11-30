@@ -12,4 +12,4 @@ src/.DS_Store
 *.json
 *.mp4
 *.pdf
-scripts/__pycache__
+scripts/__pycache__/

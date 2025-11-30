@@ -73,6 +73,55 @@ class RobotKinematics:
         T, _ = self.forward_kinematics(self.home_config)
         return T
     
+    def get_end_effector_pose(self, q: np.ndarray = None) -> np.ndarray:
+        """
+        Get the end-effector pose for a given joint configuration.
+        
+        Args:
+            q: Joint angles (6,)
+            
+        Returns:
+            4x4 transformation matrix of end-effector pose
+        """
+        T, _ = self.forward_kinematics(self.home_config if q is None else q)
+        return T
+    
+    def get_end_effector_position(self, q: np.ndarray = None) -> np.ndarray:
+        """
+        Get the end-effector position for a given joint configuration.
+        
+        Args:
+            q: Joint angles (6,)
+            
+        Returns:
+            3x1 vector of end-effector position
+        """
+        T = self.get_end_effector_pose(self.home_config if q is None else q)
+        return T[:3, 3]
+    
+    def get_end_effector_orientation(self, q: np.ndarray = None, mode: str = 'euler') -> np.ndarray:
+        """
+        Get the end-effector orientation for a given joint configuration.
+        
+        Args:
+            q: Joint angles (6,)
+            mode: ['euler' (default), 'matrix', 'quaternion']
+        Returns:
+            Orientation in the specified mode
+            - 'euler': 3x1 vector of Euler angles (roll, pitch, yaw)
+            - 'matrix': 3x3 orientation matrix
+            - 'quaternion': 4x1 vector of quaternion (w, x, y, z)
+        """
+        T = self.get_end_effector_pose(self.home_config if q is None else q)
+        if mode == 'matrix':
+            return T[:3,:3]
+        elif mode == 'euler':
+            return R.from_matrix(T[:3,:3]).as_euler('xyz')
+        elif mode == 'quaternion':
+            return R.from_matrix(T[:3,:3]).as_quat()
+        else:
+            raise ValueError(f"Invalid mode: {mode}")
+    
     @staticmethod
     def rot_trans_x(angle: float, offset: float) -> np.ndarray:
         """Rotation and translation about X axis."""
@@ -105,7 +154,7 @@ class RobotKinematics:
         AL, A, D, TH = self.dh_params['AL'], self.dh_params['A'], self.dh_params['D'], self.dh_params['TH']
         return self.rot_trans_x(AL[i], A[i]) @ self.rot_trans_z(qi + TH[i+1], D[i+1])
     
-    def forward_kinematics(self, q: np.ndarray) -> Tuple[np.ndarray, List[np.ndarray]]:
+    def forward_kinematics(self, q: np.ndarray = None) -> Tuple[np.ndarray, List[np.ndarray]]:
         """
         Compute forward kinematics.
         
@@ -115,6 +164,7 @@ class RobotKinematics:
         Returns:
             Tuple of (End-effector transformation matrix, List of intermediate transforms)
         """
+        q = self.home_config if q is None else q
         T = np.eye(4)
         transforms = [T.copy()]
         
@@ -168,7 +218,8 @@ class RobotKinematics:
         return np.vstack([J_v, J_o])
     
     def numerical_inverse_kinematics(self, q_curr: np.ndarray, Td: np.ndarray, 
-                                   max_iter: int = 50, tol: float = 1e-4) -> Tuple[np.ndarray, bool]:
+                                     max_iter: int = 50, tol: float = 1e-4
+                                     ) -> Tuple[np.ndarray, bool]:
         """
         Compute Inverse Kinematics using Damped Levenberg-Marquardt.
         
@@ -232,10 +283,11 @@ class RobotKinematics:
         return q, success
 
     def differential_inverse_kinematics_step(self, q_curr: np.ndarray, 
-                                           Td: np.ndarray, 
-                                           vd: np.ndarray, 
-                                           dt: float,
-                                           max_vel: float = 6.0) -> Tuple[np.ndarray, np.ndarray]:
+                                             Td: np.ndarray, 
+                                             vd: np.ndarray, 
+                                             dt: float,
+                                             max_vel: float = 6.0
+                                             ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Compute one step of Differential Inverse Kinematics.
         

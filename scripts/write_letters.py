@@ -185,6 +185,8 @@ class LetterWriter:
         print(f"Generated {len(segments)} segments.")
         
         # Execute (Simulation/Generation)
+        # controller.execute returns: 
+        # (time_log, q_log, q_dot_log, vd_log, v_act_log, Td_log, segment_indices)
         results = self.controller.execute(segments, start_q)
         time_log, q_traj = results[0], results[1]
         
