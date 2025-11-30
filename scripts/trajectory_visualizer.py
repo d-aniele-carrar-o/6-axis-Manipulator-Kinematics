@@ -15,6 +15,7 @@ class TrajectoryVisualizer:
     def __init__(self, robot: RobotKinematics, 
                  frame_scale: float = 0.05,
                  animation_interval: int = 100,
+                 speedup: int = 1,
                  figsize: Tuple[int, int] = (16, 12)):
         """
         Initialize trajectory visualizer.
@@ -23,11 +24,13 @@ class TrajectoryVisualizer:
             robot: RobotKinematics instance
             frame_scale: Scale factor for coordinate frame visualization
             animation_interval: Animation frame interval in milliseconds
+            speedup: Frame skipping factor (1 = show all frames, 2 = show every 2nd, etc.)
             figsize: Figure size for plots
         """
         self.robot = robot
         self.frame_scale = frame_scale
         self.animation_interval = animation_interval
+        self.speedup = max(1, int(speedup))
         self.figsize = figsize
     
     def plot_frame(self, ax, T: np.ndarray, scale: Optional[float] = None):
@@ -126,13 +129,16 @@ class TrajectoryVisualizer:
         Returns:
             FuncAnimation object
         """
+        # Apply speedup
+        q_display = q_trajectory[::self.speedup]
+
         # Prepare desired trajectory for visualization
         desired_trajectory = []
         desired_trajectory.append(self.robot.get_end_effector_pose())
         for seg in segments:
             desired_trajectory.append(seg.end_pose)
         
-        data = self._precompute_trajectory_data(q_trajectory, desired_trajectory)
+        data = self._precompute_trajectory_data(q_display, desired_trajectory)
         
         fig = plt.figure(figsize=self.figsize)
         ax = fig.add_subplot(111, projection='3d')
@@ -175,7 +181,10 @@ class TrajectoryVisualizer:
             ax.set_xlabel('X (m)')
             ax.set_ylabel('Y (m)')
             ax.set_zlabel('Z (m)')
-            ax.set_title(f'Frame {frame + 1}/{len(q_trajectory)}')
+            
+            # Show real frame index
+            real_frame = frame * self.speedup
+            ax.set_title(f'Frame {real_frame}/{len(q_trajectory)} (Speedup: {self.speedup}x)')
             ax.legend(loc='upper right')
             ax.grid(True)
             
@@ -185,7 +194,7 @@ class TrajectoryVisualizer:
                      transform=ax.transAxes,
                      bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
         
-        anim = FuncAnimation(fig, update, frames=len(q_trajectory), 
+        anim = FuncAnimation(fig, update, frames=len(q_display), 
                            interval=self.animation_interval, repeat=True)
         plt.tight_layout()
         plt.show()

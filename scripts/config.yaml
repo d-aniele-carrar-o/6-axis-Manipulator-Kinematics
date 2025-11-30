@@ -22,8 +22,8 @@ trajectory:
     type: "lspb" # Options: "cubic", "quintic", "lspb", "linear"
     
     # Constraints for LSPB (Trapezoidal)
-    max_velocity: 0.1        # m/s or rad/s
-    max_acceleration: 0.5    # m/s^2 or rad/s^2
+    max_velocity: 0.02        # m/s or rad/s
+    max_acceleration: 0.01    # m/s^2 or rad/s^2
     
     # Boundary conditions for polynomial profiles
     # Default is zero velocity/acceleration at start/end
@@ -41,7 +41,8 @@ visualization:
   animate: true
   plot_analysis: true
   frame_scale: 0.05
-  animation_interval: 100 # ms
+  animation_interval: 20 # ms
+  speedup: 2 # Frame skipping factor (1=all frames, 5=every 5th frame)
 
 real_robot:
   execute: false                 # Set to true to execute on real robot

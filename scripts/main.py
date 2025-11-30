@@ -115,10 +115,14 @@ def main():
     
     # 5. Visualization
     if config['visualization']['animate'] or config['visualization']['plot_analysis']:
+        # Use get() with default 1 for speedup to be backward compatible
+        speedup = config['visualization']['speedup']
+        
         visualizer = TrajectoryVisualizer(
             robot, 
             frame_scale=config['visualization']['frame_scale'],
-            animation_interval=config['visualization']['animation_interval']
+            animation_interval=config['visualization']['animation_interval'],
+            speedup=speedup
         )
         
         if config['visualization']['animate']:
