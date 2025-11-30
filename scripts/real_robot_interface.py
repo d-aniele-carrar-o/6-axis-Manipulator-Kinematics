@@ -172,28 +172,22 @@ class GrblRobotControl:
         # Apply Sign Inversion for GRBL
         delta_grbl = delta_deg * self.AXIS_SIGNS[joint_idx-1]
         
-        # Calculate Absolute Target based on tracked position
-        # We use absolute moves to prevent accumulation of truncation errors
-        current_pos = self.simulated_mpos[joint_idx-1]
-        raw_target = current_pos + delta_grbl
-        
-        # Format exactly as it will be sent to ensure state consistency
-        target_str = f"{raw_target:.3f}"
-        target_val = float(target_str)
-        
-        # Build G-code command (Absolute Mode G90)
-        gcode = f"G90 G1 {axis}{target_str} F{speed}"
-        print(f"J{joint_idx}: Sending '{gcode}'")
+        # Use Relative Mode (G91) for jogging
+        # This is more robust than absolute mode if tracked position is off
+        delta_str = f"{delta_grbl:.3f}"
+        gcode = f"G91 G1 {axis}{delta_str} F{speed}"
+        print(f"J{joint_idx} (Jog): Sending '{gcode}'")
         
         # Send command
         success = self.send_command(gcode)
         
-        # Always restore absolute mode (though we used it)
+        # Always restore absolute mode (G90)
         self.send_command("G90")
         
         if success:
-            self.simulated_mpos[joint_idx-1] = target_val
-            print(f"  -> OK: J{joint_idx} moved by {delta_deg} deg (Target: {target_val})")
+            # Update internal tracking
+            self.simulated_mpos[joint_idx-1] += delta_grbl
+            print(f"  -> OK: J{joint_idx} moved by {delta_deg} deg (Tracked: {self.simulated_mpos[joint_idx-1]:.3f})")
         else:
             print(f"  -> FAILED: J{joint_idx} command not executed!")
 
