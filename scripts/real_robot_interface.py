@@ -374,27 +374,66 @@ class GrblRobotControl:
         
         if first.startswith('J'):
             try:
-                joint = int(first[1:])
-                direction = parts[1]
-                val = float(parts[2])
-                if direction == '-': val = -val
+                # Flexible parsing: J1 10, J1 + 10, J1 -10
+                joint_str = first[1:]
+                if not joint_str: raise ValueError("Joint number must follow J (e.g. J1)")
+                joint = int(joint_str)
+                
+                # Default values
+                val = 0.0
                 speed = 1750
-                if len(parts) > 3: speed = float(parts[3])
+                
+                if len(parts) >= 2:
+                    remaining = parts[1:]
+                    
+                    # Handle optional direction sign as separate token
+                    if remaining[0] in ['+', '-']:
+                        sign = remaining.pop(0)
+                        if not remaining: raise ValueError("Missing value")
+                        val = float(remaining.pop(0))
+                        if sign == '-': val = -val
+                    else:
+                        val = float(remaining.pop(0))
+                        
+                    # Speed
+                    if remaining:
+                        speed = float(remaining[0])
+                else:
+                    raise ValueError("Missing value")
+
                 self.move_joints_rel(joint, val, speed)
-            except:
-                print("Invalid Joint Cmd")
+            except Exception as e:
+                print(f"Invalid Joint Cmd: {e}")
                 
         elif first in ['X', 'Y', 'Z']:
             try:
                 axis = first
-                direction = parts[1]
-                val = float(parts[2])
-                if direction == '-': val = -val
+                
+                # Default values
+                val = 0.0
                 speed = 1750
-                if len(parts) > 3: speed = float(parts[3])
+                
+                if len(parts) >= 2:
+                    remaining = parts[1:]
+                    
+                    # Handle optional direction sign as separate token
+                    if remaining[0] in ['+', '-']:
+                        sign = remaining.pop(0)
+                        if not remaining: raise ValueError("Missing value")
+                        val = float(remaining.pop(0))
+                        if sign == '-': val = -val
+                    else:
+                        val = float(remaining.pop(0))
+                        
+                    # Speed
+                    if remaining:
+                        speed = float(remaining[0])
+                else:
+                    raise ValueError("Missing value")
+
                 self.move_cartesian_rel(axis, val, speed)
-            except:
-                print("Invalid Cart Cmd")
+            except Exception as e:
+                print(f"Invalid Cart Cmd: {e}")
 
 
 if __name__ == "__main__":
