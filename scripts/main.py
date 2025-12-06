@@ -57,6 +57,7 @@ def main():
     
     # Extract parameters
     robot_name = config['robot']['name']
+    home_config = config['robot'][robot_name]['home_config']
     
     # Targets
     targets = config['targets']
@@ -64,22 +65,17 @@ def main():
     # Trajectory Settings
     traj_config = config['trajectory']
     dt = traj_config['dt']
-    
-    # Velocity Profile Params
-    vel = traj_config['velocity_profile']['velocity']
+    precision = traj_config['precision']
     
     print(f"--- Configuration Loaded ---")
     print(f"Robot: {robot_name}")
     print(f"Targets: {len(targets)} waypoints")
-    print(f"Trajectory: dt={dt}s")
-    print(f"Velocity: vel={vel}")
     print(f"----------------------------")
 
     # 2. Initialize System
-    robot = RobotKinematics(robot_name, home_config=config['robot'][robot_name]['home_config'])
+    robot = RobotKinematics(robot_name, home_config=home_config)
     planner = CNCPlanner()
-    controller = CNCController(robot, dt)
-    
+    controller = CNCController(robot, dt, precision=precision)
     print(f"Robot home configuration: {np.rad2deg(robot.home_config)} deg")
     
     # 3. Plan Path
@@ -87,6 +83,7 @@ def main():
     for i, target in enumerate(targets):
         position = np.array(target['position'])
         orientation = target['orientation']
+        velocity = target['velocity']
         mode = target.get('mode', 'exact_stop')
         
         print(f"Adding waypoint {i+1}: Pos={position}, Euler={orientation}, Mode={mode}")
@@ -94,7 +91,7 @@ def main():
         planner.add_move(
             position=position,
             euler_rpy=orientation,
-            vel=vel, 
+            vel=velocity, 
             mode=mode
         )
 
@@ -114,7 +111,6 @@ def main():
     
     # 5. Visualization
     if config['visualization']['animate'] or config['visualization']['plot_analysis']:
-        # Use get() with default 1 for speedup to be backward compatible
         speedup = config['visualization']['speedup']
         
         visualizer = TrajectoryVisualizer(

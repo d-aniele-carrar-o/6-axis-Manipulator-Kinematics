@@ -1,12 +1,12 @@
 import numpy as np
 from abc import ABC, abstractmethod
-from typing import Tuple
+from typing import List, Tuple
 
 # --- Modular Velocity Profile System ---
 class VelocityProfile(ABC):
     """Abstract base class for motion profiles."""
     @abstractmethod
-    def generate(self, distance: np.ndarray, vel: float, a_max: float = 2.) -> Tuple[np.ndarray, np.ndarray]:
+    def generate(self, distance: np.ndarray, vel: List[float], a_max: float = 2.) -> Tuple[np.ndarray, np.ndarray]:
         """Returns position and velocity arrays for a synchronized LSPB."""
         pass
 
@@ -14,9 +14,9 @@ class LSPBProfile(VelocityProfile):
     """
     Linear Segment with Parabolic Blend (Trapezoidal Velocity Profile).
     """
-    def generate(self, distance: np.ndarray, vel: float, a_max: float = 2.):
+    def generate(self, distance: np.ndarray, vel: List[float], a_max: float = 2.):
         # Blend time: time to reach vel
-        self.t_b = vel / a_max
+        self.t_b = np.max(vel) / a_max
         # Total segment period
         self.distance = np.array(distance)
         self.T = np.max(self.distance / vel) + self.t_b
@@ -28,7 +28,7 @@ class LSPBProfile(VelocityProfile):
             self.T = 2 * self.t_b
             # Recalculate for triangular profile
             self.a_max = self.distance / (self.t_b**2)
-            self.v_cruise = a_max * self.t_b
+            self.v_cruise = self.a_max * self.t_b
         else:
             # Trapezoidal Profile
             self.v_cruise = self.distance / (self.T - self.t_b)
@@ -53,8 +53,8 @@ if __name__ == "__main__":
     
     # Test scenarios
     scenarios = [
-        {"name": "Trapezoidal (Long Distance)", "distance": [13., 4.], "vel": 3.0},
-        {"name": "Triangular (Short Distance)", "distance": [1.5, 0.], "vel": 2.0},
+        {"name": "Trapezoidal (Long Distance)", "distance": [2., 4.], "vel": [3.0, 5.0]},
+        {"name": "Triangular (Short Distance)", "distance": [1.5, 0.1], "vel": [2.0, 1.0]},
     ]
     
     profile = LSPBProfile()

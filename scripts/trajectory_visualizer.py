@@ -9,6 +9,17 @@ from robot_kinematics import RobotKinematics
 from CNC import CartesianSegment
 
 
+def unwrap_euler(euler_angles: np.ndarray, discont: float = np.pi) -> np.ndarray:
+    """
+    Unwrap Euler angles to prevent jumps when crossing +/- 180 degrees.
+    Works by checking differences between consecutive frames.
+    """
+    unwrapped = euler_angles.copy()
+    for i in range(3):
+        unwrapped[:, i] = np.unwrap(unwrapped[:, i], discont=discont)
+    return unwrapped
+
+
 class TrajectoryVisualizer:
     """Handles all visualization for robot trajectories."""
     
@@ -227,9 +238,14 @@ class TrajectoryVisualizer:
         desired_rpy = []
         for T in desired_trajectory:
             r = R.from_matrix(T[:3, :3])
-            zyx = r.as_euler('ZYX')  # Returns [yaw, pitch, roll]
-            desired_rpy.append([zyx[2], zyx[1], zyx[0]])  # Reorder to [roll, pitch, yaw]
+            # Use 'xyz' convention to match config input (which is RPY)
+            # Or use ZYX if you want strict intrinsic
+            # The user config uses 'xyz' extrinsic which is equivalent to 'zyx' intrinsic
+            # Let's stick to what is passed in config if possible, or consistent
+            euler = r.as_euler('xyz') 
+            desired_rpy.append(euler)
         desired_rpy = np.array(desired_rpy)
+        desired_rpy = unwrap_euler(desired_rpy) # Unwrap desired
         
         # Compute Actual EE Position & Orientation from q_trajectory
         actual_ee_positions = []
@@ -238,11 +254,12 @@ class TrajectoryVisualizer:
             Te, _ = self.robot.forward_kinematics(q)
             actual_ee_positions.append(Te[:3, 3])
             r = R.from_matrix(Te[:3, :3])
-            zyx = r.as_euler('ZYX')
-            actual_rpy.append([zyx[2], zyx[1], zyx[0]])
+            euler = r.as_euler('xyz')
+            actual_rpy.append(euler)
             
         actual_ee_positions = np.array(actual_ee_positions)
         actual_rpy = np.array(actual_rpy)
+        actual_rpy = unwrap_euler(actual_rpy) # Unwrap actual
         
         # Prepare X-axis data
         if time_log is not None:
