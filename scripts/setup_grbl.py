@@ -60,8 +60,8 @@ def setup_grbl():
     print("\nConfiguring GRBL Settings...")
     
     # Calibration Values (Steps per 90 degrees)
-    # J1: 99000, J2: 146000, J3: 139500, J4: 170000, J5: 138000
-    steps_90 = [99000, 146000, 139500, 170000, 138000]
+    # J1: 99000, J2: 196000, J3: 141000, J4: 170000, J5: 147000
+    steps_90 = [99000, 196000, 141000, 97000, 147000]
     steps_per_deg = [s / 90.0 for s in steps_90]
     
     settings = [

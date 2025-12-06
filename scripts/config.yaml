@@ -9,7 +9,7 @@ robot:
 
 trajectory:
   # General settings
-  dt: 0.02    # Time step in seconds
+  dt: 0.01    # Time step in seconds
   
   # Trajectory Interpolation Settings
   # Path is generated in Cartesian space (Straight line for position, SLERP for orientation)
@@ -19,32 +19,24 @@ trajectory:
   
   # Velocity Profile Settings (Timing along the path)
   velocity_profile:
-    type: "lspb" # Options: "cubic", "quintic", "lspb", "linear"
+    type: "lspb"
     
     # Constraints for LSPB (Trapezoidal)
-    max_velocity: 0.02        # m/s or rad/s
-    max_acceleration: 0.01    # m/s^2 or rad/s^2
-    
-    # Boundary conditions for polynomial profiles
-    # Default is zero velocity/acceleration at start/end
-    v_start: 0.0
-    v_end: 0.0
-    a_start: 0.0
-    a_end: 0.0
+    velocity: 0.2  # m/s
 
 targets:
   # List of waypoints/via-points for the trajectory
   # Each target defines position, orientation, and motion parameters
-  - position: [0.1, 0.1, 0.25]     # [x, y, z] in meters
+  - position: [0.187, 0.0, 0.0922]     # [x, y, z] in meters
     orientation: [0.0, $pi, $pi]    # [roll, pitch, yaw] in radians (ZYX Euler)
     mode: "exact_stop"              # "exact_stop" or "continuous"
     
-  - position: [0.15, 0.05, 0.3]   # Second waypoint
-    orientation: [0.0, $pi, $pi/2]
+  - position: [0.18, -0.1, 0.05]   # Second waypoint
+    orientation: [0.0, $pi, $pi]
     mode: "exact_stop"
     
-  - position: [0.05, 0.15, 0.2]   # Third waypoint
-    orientation: [0.0, $pi, 0.0]
+  - position: [0.187, 0.0, 0.235]   # Third waypoint
+    orientation: [0.0, $pi, $pi]
     mode: "exact_stop"
 
 visualization:

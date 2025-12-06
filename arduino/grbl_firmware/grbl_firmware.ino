@@ -10,6 +10,3 @@
  */
 
 #include "grbl.h"
-
-
-

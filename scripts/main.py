@@ -66,20 +66,19 @@ def main():
     dt = traj_config['dt']
     
     # Velocity Profile Params
-    v_max = traj_config['velocity_profile']['max_velocity']
-    a_max = traj_config['velocity_profile']['max_acceleration']
+    vel = traj_config['velocity_profile']['velocity']
     
     print(f"--- Configuration Loaded ---")
     print(f"Robot: {robot_name}")
     print(f"Targets: {len(targets)} waypoints")
     print(f"Trajectory: dt={dt}s")
-    print(f"Profile Limits: v_max={v_max}, a_max={a_max}")
+    print(f"Velocity: vel={vel}")
     print(f"----------------------------")
 
     # 2. Initialize System
     robot = RobotKinematics(robot_name, home_config=config['robot'][robot_name]['home_config'])
     planner = CNCPlanner()
-    controller = CNCController(robot)
+    controller = CNCController(robot, dt)
     
     print(f"Robot home configuration: {np.rad2deg(robot.home_config)} deg")
     
@@ -95,14 +94,13 @@ def main():
         planner.add_move(
             position=position,
             euler_rpy=orientation,
-            v_max=v_max, 
-            a_max=a_max,
+            vel=vel, 
             mode=mode
         )
 
     print("Generating CNC Path...")
     start_T, _ = robot.forward_kinematics()
-    segments = planner.plan(start_T, dt=dt)
+    segments = planner.plan(start_T)
     
     # 4. Execute (Control Loop Simulation)
     print("Simulating Control Loop...")
