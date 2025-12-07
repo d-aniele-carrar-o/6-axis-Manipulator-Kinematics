@@ -10,33 +10,27 @@ robot:
 trajectory:
   # General settings
   dt: 0.01    # Time step in seconds
-  
-  # Trajectory Interpolation Settings
-  # Path is generated in Cartesian space (Straight line for position, SLERP for orientation)
-  
-  # IK Method: "differential" (recommended), "numerical"
-  ik_method: "differential"
 
   # Precision Settings
   precision:
-    position: 0.005  # meters
+    position: 0.001  # meters
     orientation: 0.01  # radians
   
   # Velocity Profile Settings (Timing along the path)
   velocity_profile:
-    type: "lspb"
+    type: "s-curve"  # "lspb" or "s-curve"
 
 targets:
   # List of waypoints/via-points for the trajectory
   # Each target defines position, orientation, and motion parameters
   - position: [0.187, 0.0, 0.0922]  # [x, y, z] in meters
     orientation: [0.0, $pi, $pi]    # [roll, pitch, yaw] in radians (ZYX Euler)
-    velocity: [0.5, 2.]            # [linear, angular] in m/s and rad/s
+    velocity: [0.5, 2.]             # [linear, angular] in m/s and rad/s
     mode: "exact_stop"              # "exact_stop" or "continuous"
     
   - position: [0.18, -0.1, 0.05]   # Second waypoint
     orientation: [0.0, -$pi/4, $pi/4]
-    velocity: [0.2, 2.]
+    velocity: [0.5, 2.]
     mode: "exact_stop"
     
   - position: [0.187, 0.0, 0.235]   # Third waypoint

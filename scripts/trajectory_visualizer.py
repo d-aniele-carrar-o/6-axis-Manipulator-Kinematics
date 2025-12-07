@@ -84,11 +84,11 @@ class TrajectoryVisualizer:
         actual_ee_positions = []
         
         for q in q_trajectory:
-            Te, transforms = self.robot.forward_kinematics(q)
+            transforms = self.robot.forward_kinematics_full(q)
             joint_pos_list = [np.zeros(3)] + [T[:3, 3] for T in transforms]
             all_joint_positions.append(np.array(joint_pos_list))
-            all_ee_transforms.append(Te)
-            actual_ee_positions.append(Te[:3, 3])
+            all_ee_transforms.append(transforms[-1])
+            actual_ee_positions.append(transforms[-1][:3, 3])
         
         # Interpolate desired positions to match trajectory length
         desired_pos_raw = np.array([T[:3, 3] for T in desired_trajectory])
@@ -251,9 +251,9 @@ class TrajectoryVisualizer:
         actual_ee_positions = []
         actual_rpy = []
         for q in q_trajectory:
-            Te, _ = self.robot.forward_kinematics(q)
-            actual_ee_positions.append(Te[:3, 3])
-            r = R.from_matrix(Te[:3, :3])
+            transforms = self.robot.forward_kinematics_full(q)
+            actual_ee_positions.append(transforms[-1][:3, 3])
+            r = R.from_matrix(transforms[-1][:3, :3])
             euler = r.as_euler('xyz')
             actual_rpy.append(euler)
             

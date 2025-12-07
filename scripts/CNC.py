@@ -4,7 +4,7 @@ from scipy.spatial.transform import Rotation as R
 from numpy import pi
 
 from robot_kinematics import RobotKinematics
-from velocity_profiles import LSPBProfile
+from velocity_profiles import LSPBProfile, SCurveProfile
 
 
 # --- CNC Interpolation & Planning ---
@@ -14,7 +14,8 @@ class CartesianSegment:
     interpolated in Cartesian space.
     """
     def __init__(self, start_pose: np.ndarray, end_pose: np.ndarray, 
-                 vel: List[float], mode: str = 'exact_stop'):
+                 vel: List[float], velocity_profile: str = 'lspb',
+                 mode: str = 'exact_stop'):
         self.start_pose = start_pose
         self.end_pose = end_pose
         self.mode = mode
@@ -37,7 +38,12 @@ class CartesianSegment:
         self.angular_dist = np.linalg.norm(self.rot_vec_total)
         self.axis = self.rot_vec_total / self.angular_dist if self.angular_dist > 1e-6 else np.zeros(3)
         
-        self.profile = LSPBProfile()
+        if velocity_profile == 'lspb':
+            self.profile = LSPBProfile()
+        elif velocity_profile == 's-curve':
+            self.profile = SCurveProfile()
+        else:
+            raise ValueError(f"Invalid velocity profile: {velocity_profile}")
         self.profile.generate([self.linear_dist, self.angular_dist], vel)
         
     def get_state(self, t: float) -> Tuple[np.ndarray, np.ndarray]:
@@ -69,8 +75,9 @@ class CNCPlanner:
     Simplified Path Planner.
     Accepts via-points and generates a sequence of Cartesian Segments.
     """
-    def __init__(self):
+    def __init__(self, velocity_profile: str = 'lspb'):
         self.via_points = [] # List of (Pose, v, mode)
+        self.velocity_profile = velocity_profile
         
     def add_move(self, position: np.ndarray, euler_rpy: List[float], 
                  vel: List[float], mode: str = 'exact_stop'):
@@ -96,7 +103,7 @@ class CNCPlanner:
             vel = wp['vel']
             mode = wp['mode']
             
-            segment = CartesianSegment(current_pose, target_pose, vel, mode)
+            segment = CartesianSegment(current_pose, target_pose, vel, self.velocity_profile, mode)
             segments.append(segment)
             
             current_pose = target_pose
@@ -143,7 +150,7 @@ class CNCController:
                 Td, vd = segment.get_state(t)
                 
                 # 2. Check Execution Status
-                Te, _ = self.robot.forward_kinematics(current_q)
+                Te = self.robot.forward_kinematics(current_q)
                 
                 # Calculate Error relative to the CURRENT setpoint
                 p_err = np.linalg.norm(Td[:3,3] - Te[:3,3])

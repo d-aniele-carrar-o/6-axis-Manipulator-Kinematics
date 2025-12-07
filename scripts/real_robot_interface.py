@@ -199,7 +199,7 @@ class GrblRobotControl:
         q_curr = self.get_joint_angles()
         
         # 2. Get current Pose
-        T_curr, _ = self.kinematics.forward_kinematics(q_curr)
+        T_curr = self.kinematics.forward_kinematics(q_curr)
         
         # 3. Target Pose
         T_target = T_curr.copy()
@@ -343,7 +343,7 @@ class GrblRobotControl:
                     print(f"Status: {self.status}")
                     print(f"Simulated MPos (Deg): {self.simulated_mpos}")
                     q = self.get_joint_angles()
-                    T, _ = self.kinematics.forward_kinematics(q)
+                    T = self.kinematics.forward_kinematics(q)
                     print(f"CPos (m):   {T[:3, 3]}")
                 elif cmd == '$$':
                     # Query GRBL settings

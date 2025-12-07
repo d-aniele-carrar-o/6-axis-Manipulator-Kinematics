@@ -70,7 +70,7 @@ class RobotKinematics:
         Returns:
             4x4 transformation matrix of home pose
         """
-        T, _ = self.forward_kinematics(self.home_config)
+        T = self.forward_kinematics(self.home_config)
         return T
     
     def get_end_effector_pose(self, q: np.ndarray = None) -> np.ndarray:
@@ -83,7 +83,7 @@ class RobotKinematics:
         Returns:
             4x4 transformation matrix of end-effector pose
         """
-        T, _ = self.forward_kinematics(self.home_config if q is None else q)
+        T = self.forward_kinematics(self.home_config if q is None else q)
         return T
     
     def get_end_effector_position(self, q: np.ndarray = None) -> np.ndarray:
@@ -154,7 +154,7 @@ class RobotKinematics:
         AL, A, D, TH = self.dh_params['AL'], self.dh_params['A'], self.dh_params['D'], self.dh_params['TH']
         return self.rot_trans_x(AL[i], A[i]) @ self.rot_trans_z(qi + TH[i+1], D[i+1])
     
-    def forward_kinematics(self, q: np.ndarray = None) -> Tuple[np.ndarray, List[np.ndarray]]:
+    def forward_kinematics(self, q: np.ndarray = None) -> np.ndarray:
         """
         Compute forward kinematics.
         
@@ -166,13 +166,29 @@ class RobotKinematics:
         """
         q = self.home_config if q is None else q
         T = np.eye(4)
-        transforms = [T.copy()]
         
         for i in range(6):
             T = T @ self.transform_i_to_i1(i, q[i])
-            transforms.append(T.copy())
         
-        return T, transforms
+        return T
+    
+    def forward_kinematics_full(self, q: np.ndarray = None) -> np.ndarray:
+        """
+        Compute forward kinematics and return all intermediate transforms.
+        
+        Args:
+            q: Joint angles (6,)
+            
+        Returns:
+            List of intermediate transforms
+        """
+        q = self.home_config if q is None else q
+        T = np.eye(4)
+        transforms = [T]
+        for i in range(6):
+            T = T @ self.transform_i_to_i1(i, q[i])
+            transforms.append(T.copy())
+        return transforms
     
     def jacobian(self, q: np.ndarray) -> np.ndarray:
         """
@@ -236,7 +252,7 @@ class RobotKinematics:
         success = False
         
         for _ in range(max_iter):
-            Te, _ = self.forward_kinematics(q)
+            Te = self.forward_kinematics(q)
             J = self.jacobian(q)
             
             # Position error
@@ -302,7 +318,7 @@ class RobotKinematics:
             Tuple of (next joint configuration, joint velocities)
         """
         # 1. Compute current pose and Jacobian
-        Te, _ = self.forward_kinematics(q_curr)
+        Te = self.forward_kinematics(q_curr)
         J = self.jacobian(q_curr)
         
         # 2. Compute error twist

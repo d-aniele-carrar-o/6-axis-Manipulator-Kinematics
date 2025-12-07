@@ -57,7 +57,7 @@ class LetterWriter:
         # Orientation: Fixed Downward
         # Assuming Home is roughly [0, pi, pi] in Euler (XYZ)
         # Let's derive it from current/home pose to be safe
-        T_home, _ = self.kinematics.forward_kinematics(self.robot.HOME_CONFIG)
+        T_home = self.kinematics.forward_kinematics(self.robot.HOME_CONFIG)
         # Force a clean vertical orientation if possible, or use Home orientation
         # Home pose R is roughly: X->X, Y->-Y, Z->-Z ?
         # Let's stick to Home Orientation for consistency
@@ -173,7 +173,7 @@ class LetterWriter:
         start_q = self.robot.HOME_CONFIG # Or get_joint_angles()
         
         # Current FK
-        start_T, _ = self.kinematics.forward_kinematics(start_q)
+        start_T = self.kinematics.forward_kinematics(start_q)
         
         # Plan Segments
         segments = self.planner.plan(start_T, dt=0.04) # 25Hz

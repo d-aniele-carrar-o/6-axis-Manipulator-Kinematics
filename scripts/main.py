@@ -66,6 +66,7 @@ def main():
     traj_config = config['trajectory']
     dt = traj_config['dt']
     precision = traj_config['precision']
+    velocity_profile = traj_config['velocity_profile']['type']
     
     print(f"--- Configuration Loaded ---")
     print(f"Robot: {robot_name}")
@@ -74,7 +75,7 @@ def main():
 
     # 2. Initialize System
     robot = RobotKinematics(robot_name, home_config=home_config)
-    planner = CNCPlanner()
+    planner = CNCPlanner(velocity_profile=velocity_profile)
     controller = CNCController(robot, dt, precision=precision)
     print(f"Robot home configuration: {np.rad2deg(robot.home_config)} deg")
     
@@ -96,7 +97,7 @@ def main():
         )
 
     print("Generating CNC Path...")
-    start_T, _ = robot.forward_kinematics()
+    start_T = robot.forward_kinematics()
     segments = planner.plan(start_T)
     
     # 4. Execute (Control Loop Simulation)
