@@ -9,6 +9,7 @@ dependencies = [
     "scipy>=1.7.0",
     "pyserial>=3.5",
     "pyyaml>=6.0.3",
+    "pybullet>=3.2.7",
 ]
 
 [project.optional-dependencies]
@@ -25,8 +26,8 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["scripts"]
 
-[tool.uv]
-dev-dependencies = [
+[dependency-groups]
+dev = [
     "pytest>=6.0",
     "black>=22.0",
     "flake8>=4.0",

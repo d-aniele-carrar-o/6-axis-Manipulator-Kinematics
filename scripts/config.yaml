@@ -39,6 +39,7 @@ targets:
     mode: "exact_stop"
 
 visualization:
+  renderer: "pybullet" # "matplotlib" or "pybullet"
   animate: true
   plot_analysis: true
   frame_scale: 0.05

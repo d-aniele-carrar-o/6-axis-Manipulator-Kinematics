@@ -111,31 +111,58 @@ def main():
         return
     
     # 5. Visualization
-    if config['visualization']['animate'] or config['visualization']['plot_analysis']:
+    renderer = config['visualization'].get('renderer', 'matplotlib')
+    animate = config['visualization']['animate']
+    plot_analysis = config['visualization']['plot_analysis']
+    
+    if animate or plot_analysis:
         speedup = config['visualization']['speedup']
         
-        visualizer = TrajectoryVisualizer(
-            robot, 
-            frame_scale=config['visualization']['frame_scale'],
-            animation_interval=config['visualization']['animation_interval'],
-            speedup=speedup
-        )
-        
-        if config['visualization']['animate']:
-            print("Displaying Animation...")
-            visualizer.animate_trajectory(q_traj, segments)
-            
-        if config['visualization']['plot_analysis']:
-            print("Displaying Analysis Plots...")
-            visualizer.plot_analysis(
-                q_trajectory=q_traj, 
-                q_dot_trajectory=q_dot_traj, 
-                desired_trajectory=Td_log, 
-                desired_velocities=vd_log, 
-                actual_task_velocities=v_act_log,
-                segment_indices=segment_indices,
-                time_log=time_log
+        # PyBullet Animation
+        if animate and renderer == 'pybullet':
+            try:
+                from pybullet_visualizer import PyBulletVisualizer
+                
+                # Determine URDF path based on robot name
+                urdf_map = {
+                    "3Dprinted": "src/robot_urdf/printed_man.urdf",
+                    "UR3e": "src/robot_urdf/ur3e.urdf"
+                }
+                urdf_path = urdf_map.get(robot_name, "src/robot_urdf/printed_man.urdf")
+                
+                print(f"Displaying Animation (PyBullet)...")
+                # Note: Assuming script is run such that pybullet_visualizer is importable
+                pb_viz = PyBulletVisualizer(urdf_path)
+                pb_viz.animate_trajectory(q_traj, time_log, speedup=speedup, loop=True)
+                
+            except ImportError as e:
+                print(f"Error initializing PyBullet visualizer: {e}")
+                print("Falling back to Matplotlib or skipping animation.")
+
+        # Matplotlib Animation and/or Analysis
+        if (animate and renderer == 'matplotlib') or plot_analysis:
+            visualizer = TrajectoryVisualizer(
+                robot, 
+                frame_scale=config['visualization']['frame_scale'],
+                animation_interval=config['visualization']['animation_interval'],
+                speedup=speedup
             )
+            
+            if animate and renderer == 'matplotlib':
+                print("Displaying Animation (Matplotlib)...")
+                visualizer.animate_trajectory(q_traj, segments)
+            
+            if plot_analysis:
+                print("Displaying Analysis Plots...")
+                visualizer.plot_analysis(
+                    q_trajectory=q_traj, 
+                    q_dot_trajectory=q_dot_traj, 
+                    desired_trajectory=Td_log, 
+                    desired_velocities=vd_log, 
+                    actual_task_velocities=v_act_log,
+                    segment_indices=segment_indices,
+                    time_log=time_log
+                )
 
     # 6. Real Robot Execution
     if config['real_robot']['execute']:
