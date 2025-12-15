@@ -238,10 +238,10 @@ class TrajectoryVisualizer:
         desired_rpy = []
         for T in desired_trajectory:
             r = R.from_matrix(T[:3, :3])
-            # Use 'xyz' convention to match config input (which is RPY)
-            # Or use ZYX if you want strict intrinsic
-            # The user config uses 'xyz' extrinsic which is equivalent to 'zyx' intrinsic
-            # Let's stick to what is passed in config if possible, or consistent
+            # Convention used across the project:
+            # - Waypoints specify RPY = [roll, pitch, yaw] in radians.
+            # - Rotation is built as R = Rz(yaw) * Ry(pitch) * Rx(roll).
+            # - In SciPy, this corresponds to extrinsic 'xyz' with angles [roll, pitch, yaw].
             euler = r.as_euler('xyz') 
             desired_rpy.append(euler)
         desired_rpy = np.array(desired_rpy)

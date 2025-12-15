@@ -3,7 +3,7 @@ import pybullet_data
 import time
 import numpy as np
 import os
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
 class PyBulletVisualizer:
     def __init__(self, urdf_path: str, use_gui: bool = True):
@@ -18,6 +18,11 @@ class PyBulletVisualizer:
         
         # Try connecting with standard GUI, if that fails or crashes, one might need options="--opengl2"
         # We'll use --opengl2 by default as it's more stable on some Linux setups
+        # If there's no X server/display, GUI will crash; fall back to DIRECT.
+        if use_gui and not os.environ.get("DISPLAY"):
+            print("PyBullet GUI requested but $DISPLAY is not set; falling back to DIRECT.")
+            use_gui = False
+
         connection_mode = p.GUI if use_gui else p.DIRECT
         try:
             # Using --opengl2 often helps with X11 compatibility/drivers
@@ -25,6 +30,7 @@ class PyBulletVisualizer:
         except Exception:
             print("Failed to connect with --opengl2, trying default...")
             self.physics_client = p.connect(connection_mode)
+        self._closed = False
         
         # Calculate paths
         project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -137,7 +143,25 @@ class PyBulletVisualizer:
             print("Animation interrupted by user.")
         
     def close(self):
-        p.disconnect()
+        """
+        Disconnect the PyBullet physics client created by this visualizer.
+        Safe to call multiple times.
+        """
+        if getattr(self, "_closed", False):
+            return
+        try:
+            # Disconnect the specific client id we opened (safer than disconnecting "current").
+            if self.physics_client is not None and p.isConnected(self.physics_client):
+                p.disconnect(self.physics_client)
+        finally:
+            self._closed = True
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self.close()
+        return False
 
 if __name__ == "__main__":
     # Test stub

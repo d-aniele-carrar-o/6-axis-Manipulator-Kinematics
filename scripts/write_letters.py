@@ -13,8 +13,7 @@ from scipy.spatial.transform import Rotation as R
 # Add current directory to path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from grbl_control import GrblRobotControl
-from robot_kinematics import RobotKinematics
+from real_robot_interface import GrblRobotControl
 from CNC import CNCPlanner, CNCController
 
 class LetterWriter:

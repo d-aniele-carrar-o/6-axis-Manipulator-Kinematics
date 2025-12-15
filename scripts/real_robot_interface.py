@@ -28,7 +28,7 @@ class GrblRobotControl:
         self.connect(port, baud)
         
         # Kinematics
-        self.kinematics = RobotKinematics("3Dprinted")
+        self.kinematics = RobotKinematics(home_config=self.HOME_CONFIG, robot_type="3Dprinted")
         
         # CNC Controller for Trajectory Generation
         self.controller = CNCController(self.kinematics)

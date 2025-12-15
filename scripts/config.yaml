@@ -24,7 +24,7 @@ targets:
   # List of waypoints/via-points for the trajectory
   # Each target defines position, orientation, and motion parameters
   - position: [0.187, 0.0, 0.0922]  # [x, y, z] in meters
-    orientation: [0.0, $pi, $pi]    # [roll, pitch, yaw] in radians (ZYX Euler)
+    orientation: [0.0, $pi, $pi]    # [roll, pitch, yaw] in radians (RPY)
     velocity: [0.5, 2.]             # [linear, angular] in m/s and rad/s
     mode: "exact_stop"              # "exact_stop" or "continuous"
     
@@ -45,6 +45,8 @@ visualization:
   frame_scale: 0.05
   animation_interval: 20 # ms
   speedup: 5 # Frame skipping factor (1=all frames, 5=every 5th frame)
+  pybullet_use_gui: true # Set false for headless/remote sessions (uses p.DIRECT)
+  pybullet_loop: true # Loop the animation until interrupted
 
 real_robot:
   execute: true                 # Set to true to execute on real robot

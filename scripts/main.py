@@ -10,6 +10,7 @@ visualizes the result, and optionally executes it on the real robot.
 import numpy as np
 import os
 import yaml
+import ast
 from typing import Any
 
 from robot_kinematics import RobotKinematics
@@ -29,18 +30,55 @@ def load_config(config_path: str = "config.yaml") -> Any:
         # Load as raw YAML first to handle structure
         config = yaml.safe_load(f)
 
+    def _safe_eval_arithmetic(expr: str) -> float:
+        """
+        Safely evaluate a simple arithmetic expression.
+
+        Supported:
+        - numeric literals (int/float)
+        - +, -, *, /
+        - parentheses
+        - the name 'pi'
+
+        Anything else raises ValueError.
+        """
+        node = ast.parse(expr, mode="eval")
+
+        def _eval(n):
+            if isinstance(n, ast.Expression):
+                return _eval(n.body)
+            if isinstance(n, ast.Constant) and isinstance(n.value, (int, float)):
+                return float(n.value)
+            if isinstance(n, ast.UnaryOp) and isinstance(n.op, (ast.UAdd, ast.USub)):
+                val = _eval(n.operand)
+                return +val if isinstance(n.op, ast.UAdd) else -val
+            if isinstance(n, ast.BinOp) and isinstance(n.op, (ast.Add, ast.Sub, ast.Mult, ast.Div)):
+                left = _eval(n.left)
+                right = _eval(n.right)
+                if isinstance(n.op, ast.Add):
+                    return left + right
+                if isinstance(n.op, ast.Sub):
+                    return left - right
+                if isinstance(n.op, ast.Mult):
+                    return left * right
+                return left / right
+            if isinstance(n, ast.Name) and n.id == "pi":
+                return float(np.pi)
+            raise ValueError(f"Unsupported expression: {expr!r}")
+
+        return _eval(node)
+
     def evaluate_pi_expressions(data):
-        """Recursively traverse and evaluate strings containing $pi."""
+        """Recursively traverse and evaluate strings containing $pi (no eval())."""
         if isinstance(data, dict):
             return {k: evaluate_pi_expressions(v) for k, v in data.items()}
         elif isinstance(data, list):
             return [evaluate_pi_expressions(i) for i in data]
         elif isinstance(data, str) and '$pi' in data:
-            # Replace $pi with numeric value and evaluate
-            # WARNING: eval is used here. Only use with trusted config files.
-            expr = data.replace('$pi', str(np.pi))
             try:
-                return eval(expr, {"__builtins__": None}, {})
+                # Replace $pi with a safe constant name and evaluate a restricted grammar.
+                expr = data.replace('$pi', 'pi')
+                return _safe_eval_arithmetic(expr)
             except Exception as e:
                 print(f"Warning: Could not evaluate expression '{data}': {e}")
                 return data
@@ -74,7 +112,7 @@ def main():
     print(f"----------------------------")
 
     # 2. Initialize System
-    robot = RobotKinematics(robot_name, home_config=home_config)
+    robot = RobotKinematics(home_config=home_config, robot_type=robot_name)
     planner = CNCPlanner(velocity_profile=velocity_profile)
     controller = CNCController(robot, dt, precision=precision)
     print(f"Robot home configuration: {np.rad2deg(robot.home_config)} deg")
@@ -87,7 +125,7 @@ def main():
         velocity = target['velocity']
         mode = target.get('mode', 'exact_stop')
         
-        print(f"Adding waypoint {i+1}: Pos={position}, Euler={orientation}, Mode={mode}")
+        print(f"Adding waypoint {i+1}: Pos={position}, RPY={orientation} (rad), Mode={mode}")
         
         planner.add_move(
             position=position,
@@ -120,24 +158,34 @@ def main():
         
         # PyBullet Animation
         if animate and renderer == 'pybullet':
+            pb_viz = None
             try:
                 from pybullet_visualizer import PyBulletVisualizer
-                
+
                 # Determine URDF path based on robot name
                 urdf_map = {
                     "3Dprinted": "src/robot_urdf/printed_man.urdf",
                     "UR3e": "src/robot_urdf/ur3e.urdf"
                 }
                 urdf_path = urdf_map.get(robot_name, "src/robot_urdf/printed_man.urdf")
-                
+
                 print(f"Displaying Animation (PyBullet)...")
                 # Note: Assuming script is run such that pybullet_visualizer is importable
-                pb_viz = PyBulletVisualizer(urdf_path)
-                pb_viz.animate_trajectory(q_traj, time_log, speedup=speedup, loop=True)
-                
+                use_gui = config['visualization'].get('pybullet_use_gui', True)
+                loop = config['visualization'].get('pybullet_loop', True)
+                pb_viz = PyBulletVisualizer(urdf_path, use_gui=use_gui)
+                pb_viz.animate_trajectory(q_traj, time_log, speedup=speedup, loop=loop)
+
             except ImportError as e:
                 print(f"Error initializing PyBullet visualizer: {e}")
                 print("Falling back to Matplotlib or skipping animation.")
+            finally:
+                # Ensure the PyBullet physics client is always disconnected to avoid resource leaks.
+                if pb_viz is not None:
+                    try:
+                        pb_viz.close()
+                    except Exception:
+                        pass
 
         # Matplotlib Animation and/or Analysis
         if (animate and renderer == 'matplotlib') or plot_analysis:

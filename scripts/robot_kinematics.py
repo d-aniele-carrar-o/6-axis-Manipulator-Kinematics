@@ -6,18 +6,18 @@ from typing import Dict, Tuple, List, Optional
 class RobotKinematics:
     """Handles kinematics for 6-DOF robots using Modified DH parameters."""
     
-    def __init__(self, robot_type: str = "3Dprinted", home_config: Optional[np.ndarray] = None):
+    def __init__(self, home_config: np.ndarray, robot_type: str = "3Dprinted"):
         """
         Initialize robot with DH parameters.
         
         Args:
+            home_config: Home joint configuration.
             robot_type: Name of the robot ("3Dprinted" or "UR3e")
-            home_config: Optional home joint configuration. If None, uses default for robot type.
         """
         self.robot_type = robot_type
         self.dh_params = self._get_dh_parameters(robot_type)
         self.joint_limits = np.array([-2*np.pi, 2*np.pi])
-        self.home_config = home_config if home_config is not None else self._get_home_config(robot_type)
+        self.home_config = home_config
         
     def _get_dh_parameters(self, robot_type: str) -> Dict[str, np.ndarray]:
         """
@@ -46,23 +46,6 @@ class RobotKinematics:
         else:
             raise ValueError(f"Robot type {robot_type} not supported")
     
-    def _get_home_config(self, robot_type: str) -> np.ndarray:
-        """
-        Get default home joint configuration for robot type.
-        
-        Args:
-            robot_type: Name of the robot
-            
-        Returns:
-            Home joint angles (6,)
-        """
-        if robot_type == "3Dprinted":
-            return np.array([0.0, np.pi/2, 0.0, 0.0, np.pi/4, 0.0])
-        elif robot_type == "UR3e":
-            return np.array([0.0, -np.pi/2, 0.0, -np.pi/2, 0.0, 0.0])
-        else:
-            return np.zeros(6)
-    
     def get_home_pose(self) -> np.ndarray:
         """
         Get the end-effector pose at home configuration.
@@ -70,8 +53,7 @@ class RobotKinematics:
         Returns:
             4x4 transformation matrix of home pose
         """
-        T = self.forward_kinematics(self.home_config)
-        return T
+        return self.forward_kinematics(self.home_pose)
     
     def get_end_effector_pose(self, q: np.ndarray = None) -> np.ndarray:
         """
@@ -83,8 +65,7 @@ class RobotKinematics:
         Returns:
             4x4 transformation matrix of end-effector pose
         """
-        T = self.forward_kinematics(self.home_config if q is None else q)
-        return T
+        return self.forward_kinematics(self.home_config if q is None else q)
     
     def get_end_effector_position(self, q: np.ndarray = None) -> np.ndarray:
         """

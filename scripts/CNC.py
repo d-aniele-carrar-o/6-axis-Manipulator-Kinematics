@@ -79,11 +79,18 @@ class CNCPlanner:
         self.via_points = [] # List of (Pose, v, mode)
         self.velocity_profile = velocity_profile
         
-    def add_move(self, position: np.ndarray, euler_rpy: List[float], 
+    def add_move(self, position: np.ndarray, euler_rpy: List[float],
                  vel: List[float], mode: str = 'exact_stop'):
         """
         Add a target waypoint.
         mode: 'exact_stop' (G61) or 'continuous' (G64)
+
+        Orientation convention (IMPORTANT):
+        - `euler_rpy` is [roll, pitch, yaw] in radians.
+        - We build the rotation as R = Rz(yaw) * Ry(pitch) * Rx(roll).
+          In SciPy this corresponds to `Rotation.from_euler('xyz', [roll, pitch, yaw])`
+          (extrinsic rotations about fixed axes). This is also equivalent to an
+          intrinsic ZYX Euler convention with angles [yaw, pitch, roll].
         """
         R_mat = R.from_euler('xyz', euler_rpy).as_matrix()
         T = np.eye(4)
