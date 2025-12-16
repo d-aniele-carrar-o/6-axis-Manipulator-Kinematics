@@ -112,10 +112,12 @@ def main():
     print(f"----------------------------")
 
     # 2. Initialize System
-    robot = RobotKinematics(home_config=home_config, robot_type=robot_name)
+    robot = RobotKinematics(home_config, robot_type=robot_name)
     planner = CNCPlanner(velocity_profile=velocity_profile)
     controller = CNCController(robot, dt, precision=precision)
     print(f"Robot home configuration: {np.rad2deg(robot.home_config)} deg")
+    home_pose = robot.get_home_pose()
+    print(f"Robot home pos: {home_pose[:3,3]}")
     
     # 3. Plan Path
     # Add all moves from config

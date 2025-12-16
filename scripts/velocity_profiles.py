@@ -110,7 +110,7 @@ class SCurveProfile(VelocityProfile):
     S-Curve (Double S) Velocity Profile with Multi-Axis Synchronization.
     Automatically handles ideal, triangular, and short-move cases.
     """
-    def generate(self, distance: List[float], vel: List[float], a_max: float = 1., j_max: float = 2.):
+    def generate(self, distance: List[float], vel: List[float], a_max: float = 7.5, j_max: float = 10.):
         """
         Calculates synchronized S-Curve parameters.
         Args:

@@ -25,11 +25,17 @@ class PyBulletVisualizer:
 
         connection_mode = p.GUI if use_gui else p.DIRECT
         try:
-            # Using --opengl2 often helps with X11 compatibility/drivers
-            self.physics_client = p.connect(connection_mode, options="--opengl2")
-        except Exception:
-            print("Failed to connect with --opengl2, trying default...")
-            self.physics_client = p.connect(connection_mode)
+            # On macOS, avoid --opengl2 flag as it can cause crashes
+            import platform
+            if platform.system() == "Darwin":  # macOS
+                self.physics_client = p.connect(connection_mode)
+            else:
+                # Using --opengl2 often helps with X11 compatibility/drivers on Linux
+                self.physics_client = p.connect(connection_mode, options="--opengl2")
+        except Exception as e:
+            print(f"Failed to connect with GUI mode: {e}")
+            print("Falling back to DIRECT mode (no visualization)...")
+            self.physics_client = p.connect(p.DIRECT)
         self._closed = False
         
         # Calculate paths

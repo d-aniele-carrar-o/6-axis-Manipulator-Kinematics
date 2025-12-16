@@ -1,3 +1,0 @@
-clc;
-
-run_main();

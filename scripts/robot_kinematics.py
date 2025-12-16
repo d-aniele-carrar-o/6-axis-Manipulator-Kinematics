@@ -53,7 +53,7 @@ class RobotKinematics:
         Returns:
             4x4 transformation matrix of home pose
         """
-        return self.forward_kinematics(self.home_pose)
+        return self.forward_kinematics(self.home_config)
     
     def get_end_effector_pose(self, q: np.ndarray = None) -> np.ndarray:
         """
